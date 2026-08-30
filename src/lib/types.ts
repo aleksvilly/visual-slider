@@ -23,7 +23,7 @@ export interface CatalogItem {
   title: string;
   creator?: string;
   sourceSite: string;
-  sourceUrl: string;
+  sourceUrl?: string;
   imageUrl: string;
   priceLabel?: string;
   buyable?: boolean;
