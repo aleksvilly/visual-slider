@@ -1,0 +1,71 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure Astro for GitHub Pages
+        run: |
+          cat > astro.config.mjs <<'EOF'
+          import { defineConfig } from 'astro/config';
+          import vue from '@astrojs/vue';
+
+          export default defineConfig({
+            site: 'https://aleksvilly.github.io',
+            base: '/visual-slider',
+            integrations: [vue()],
+          });
+          EOF
+
+      - name: Fix internal links for project Pages
+        run: |
+          sed -i 's|href="/pants"|href="/visual-slider/pants"|g' src/pages/index.astro src/layouts/BaseLayout.astro
+          sed -i 's|href="/"|href="/visual-slider/"|g' src/layouts/BaseLayout.astro
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
