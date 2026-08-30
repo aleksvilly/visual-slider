@@ -119,17 +119,22 @@ const isSaved = (item: CatalogItem) => savedIds.value.includes(item.id);
           <button type="button" @click="showMoodboard = false">×</button>
         </div>
         <p v-if="savedItems.length === 0" class="muted">Nothing saved yet.</p>
-        <a
-          v-for="item in savedItems"
-          :key="item.id"
-          class="saved-item"
-          :href="item.sourceUrl"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span>{{ item.title }}</span>
-          <small>{{ item.sourceSite }}</small>
-        </a>
+        <template v-for="item in savedItems" :key="item.id">
+          <a
+            v-if="item.sourceUrl"
+            class="saved-item"
+            :href="item.sourceUrl"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span>{{ item.title }}</span>
+            <small>{{ item.sourceSite }}</small>
+          </a>
+          <div v-else class="saved-item saved-item-demo">
+            <span>{{ item.title }}</span>
+            <small>Demo item</small>
+          </div>
+        </template>
       </div>
     </aside>
 
@@ -181,9 +186,15 @@ const isSaved = (item: CatalogItem) => savedIds.value.includes(item.id);
               <button type="button" @click="save(item)">
                 {{ isSaved(item) ? 'Saved ✓' : 'Save' }}
               </button>
-              <a :href="item.sourceUrl" target="_blank" rel="noreferrer">
+              <a
+                v-if="item.sourceUrl"
+                :href="item.sourceUrl"
+                target="_blank"
+                rel="noreferrer"
+              >
                 {{ item.buyable ? 'View / buy ↗' : 'Source ↗' }}
               </a>
+              <span v-else class="demo-source">Demo item</span>
             </div>
           </div>
         </article>
