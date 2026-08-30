@@ -11,6 +11,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "test:phase2": "node --import tsx --test tests/*.test.ts",
     "validate:migration": "node --import tsx scripts/validate-migration.ts",
     "seed:pants": "node --import tsx scripts/seed-pants.ts"
   },

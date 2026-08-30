@@ -1,0 +1,108 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getOpenAIAnalysisModel } from '../../../lib/analysis/config.server';
+import { runRecordedUrlAnalysis } from '../../../lib/analysis/workflow.server';
+import { assertSameOrigin } from '../../../lib/admin/itemForm.server';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminCategory } from '../../../lib/admin/types';
+
+let categories: AdminCategory[] = [];
+let errorMessage = '';
+let sourceUrl = Astro.url.searchParams.get('sourceUrl') ?? '';
+let categoryId = Astro.url.searchParams.get('category') ?? '';
+let repository: Awaited<ReturnType<typeof createSupabaseAdminRepository>> | null = null;
+
+try {
+  repository = await createSupabaseAdminRepository(Astro);
+  categories = await repository.listCategories();
+  if (!categories.some((category) => category.id === categoryId)) {
+    categoryId = categories.find((category) => category.status === 'published')?.id ?? categories[0]?.id ?? '';
+  }
+  if (Astro.request.method === 'POST') {
+    assertSameOrigin(Astro.request);
+    const formData = await Astro.request.formData();
+    sourceUrl = String(formData.get('sourceUrl') ?? '').trim();
+    categoryId = String(formData.get('categoryId') ?? '');
+    const category = categories.find((candidate) => candidate.id === categoryId);
+    if (!sourceUrl) throw new Error('Source URL is required.');
+    if (!category) throw new Error('Select a valid category.');
+    if (!category.attributes.some((attribute) => attribute.enabled)) {
+      throw new Error('The selected category has no enabled semantic attributes.');
+    }
+    const runId = await repository.createAnalysisRun(
+      category.id,
+      sourceUrl,
+      getOpenAIAnalysisModel(),
+    );
+    try {
+      await runRecordedUrlAnalysis(sourceUrl, category, {
+        succeed: (result) => repository!.completeAnalysisRun(runId, result),
+        fail: (failure) => repository!.failAnalysisRun(runId, failure),
+      });
+    } catch {
+      // The workflow records its failure before returning control to this page.
+    }
+    return Astro.redirect(`/admin/analysis/${runId}/`, 303);
+  }
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'The URL analysis could not be started.';
+}
+---
+
+<AdminLayout
+  title="Analyze URL"
+  activeSection="analyze"
+  description="Fetch public page metadata and generate category-specific semantic values for administrator review."
+>
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">URL-assisted analysis</p>
+      <h1>Analyze URL</h1>
+      <p>The server fetches public metadata once, asks OpenAI for dynamic category attributes, and saves a reviewable analysis run. It never publishes automatically.</p>
+    </div>
+    <span class="admin-mode">{getOpenAIAnalysisModel()} · synchronous</span>
+  </header>
+
+  <section class="admin-form-section admin-analyze-panel">
+    {errorMessage && <p class="admin-form-message admin-form-error" role="alert">{errorMessage}</p>}
+    {categories.length ? (
+      <form method="post" class="admin-analyze-form" data-pending-form>
+        <label>
+          <span>Public product / reference URL</span>
+          <input name="sourceUrl" type="url" value={sourceUrl} placeholder="https://example.com/product" required />
+        </label>
+        <label>
+          <span>Category</span>
+          <select name="categoryId" required>
+            {categories.map((category) => (
+              <option value={category.id} selected={category.id === categoryId}>
+                {category.name} · {category.status}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit">Analyze URL</button>
+        <p class="admin-form-note" data-pending-message hidden>Fetching metadata and analyzing one item. This can take up to a minute…</p>
+      </form>
+    ) : (
+      <div class="admin-empty-state admin-empty-state-compact"><span>0</span><h2>No categories</h2><p>Create a category with enabled attributes before analyzing a URL.</p></div>
+    )}
+  </section>
+
+  <section class="admin-callout admin-analysis-policy">
+    <strong>Access policy</strong>
+    <p>Only public HTTP/HTTPS pages are accepted. Local, private, reserved, authenticated, blocked, oversized, and non-HTML responses are rejected. The fetcher does not submit credentials, solve CAPTCHAs, or bypass access controls.</p>
+  </section>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll<HTMLFormElement>('[data-pending-form]').forEach((form) => {
+    form.addEventListener('submit', () => {
+      form.setAttribute('aria-busy', 'true');
+      const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (button) { button.disabled = true; button.textContent = 'Analyzing…'; }
+      const message = form.querySelector<HTMLElement>('[data-pending-message]');
+      if (message) message.hidden = false;
+    });
+  });
+</script>

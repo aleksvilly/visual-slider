@@ -28,6 +28,9 @@ jobs:
       - name: Validate migration
         run: npm run validate:migration
 
+      - name: Test Phase 2 analysis
+        run: npm run test:phase2
+
       - name: Check
         run: npm run check
 

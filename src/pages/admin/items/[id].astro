@@ -65,6 +65,7 @@ if (Astro.request.method === 'POST' && repository && item) {
 if (!item) Astro.response.status = loadError ? 500 : 404;
 const saved = Astro.url.searchParams.get('saved') === '1';
 const imported = Astro.url.searchParams.get('imported') === '1';
+const analyzed = Astro.url.searchParams.get('analyzed') === '1';
 const archived = Astro.url.searchParams.get('archived') === '1';
 const defaultInitial = item ? {
   categoryId: item.categoryId,
@@ -95,9 +96,15 @@ const defaultInitial = item ? {
         </div>
         <span class={`admin-status admin-status-${item.publicationStatus}`}>{item.publicationStatus}</span>
       </header>
-      {(saved || imported || archived) && (
+      {(saved || imported || analyzed || archived) && (
         <p class="admin-form-message admin-form-success" role="status">
-          {imported ? 'Manual import completed and its ingestion run was recorded.' : archived ? 'Item archived.' : 'Changes saved.'}
+          {analyzed
+            ? 'AI analysis reviewed and saved. The item uses the publication status you selected.'
+            : imported
+              ? 'Manual import completed and its ingestion run was recorded.'
+              : archived
+                ? 'Item archived.'
+                : 'Changes saved.'}
         </p>
       )}
       <AdminItemForm

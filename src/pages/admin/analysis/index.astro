@@ -1,0 +1,70 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminAnalysisRun } from '../../../lib/admin/types';
+
+let runs: AdminAnalysisRun[] = [];
+let errorMessage = '';
+try {
+  runs = await (await createSupabaseAdminRepository(Astro)).listAnalysisRuns();
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'Analysis runs could not be loaded.';
+}
+const formatDate = (value: string | null) => value
+  ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  : '—';
+const usage = (run: AdminAnalysisRun) => {
+  const value = run.usageMetadata && typeof run.usageMetadata === 'object' && !Array.isArray(run.usageMetadata)
+    ? run.usageMetadata as Record<string, unknown>
+    : {};
+  return Number(value.total_tokens ?? 0) || '—';
+};
+const confidence = (run: AdminAnalysisRun) => {
+  const values = run.structuredResult?.attributes.map((attribute) => attribute.confidence) ?? [];
+  return values.length ? `${Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 100)}% avg` : '—';
+};
+const publicHttpUrl = (value: string | null) => {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+};
+---
+
+<AdminLayout title="AI analysis" activeSection="analysis" description="Inspect versioned URL-assisted OpenAI analysis runs and retry failures.">
+  <header class="admin-page-head">
+    <div><p class="eyebrow">Versioned offline analysis</p><h1>AI analysis</h1><p>Every attempt retains its model, schema/prompt version, runtime, usage, confidence, structured result, and failure state.</p></div>
+    <a class="admin-primary-action" href="/admin/analyze/">Analyze URL</a>
+  </header>
+
+  {errorMessage ? (
+    <section class="admin-error-state" role="alert"><p class="eyebrow">Database error</p><h2>Analysis runs could not be loaded</h2><p>{errorMessage}</p><a href="/admin/analysis/">Try again</a></section>
+  ) : (
+    <section class="admin-table-panel">
+      <div class="admin-table-meta"><strong>{runs.length} {runs.length === 1 ? 'analysis' : 'analyses'}</strong><span>Newest first</span></div>
+      {runs.length ? (
+        <div class="admin-table-scroll"><table class="admin-table admin-analysis-table">
+          <thead><tr><th>Item / source</th><th>Status</th><th>Model</th><th>Versions</th><th>Runtime</th><th>Tokens</th><th>Confidence</th><th>Error</th><th></th></tr></thead>
+          <tbody>{runs.map((run) => (
+            <tr>
+              <td><strong>{run.itemTitle ?? run.categoryName}</strong>{publicHttpUrl(run.sourceUrl) ? <a class="admin-table-subline" href={publicHttpUrl(run.sourceUrl)!} target="_blank" rel="noreferrer">{run.sourceUrl}</a> : run.sourceUrl ? <span class="admin-table-subline">{run.sourceUrl}</span> : null}<small class="admin-table-subline">Attempt {run.attempt} · {formatDate(run.createdAt)}</small></td>
+              <td><span class={`admin-status admin-status-${run.status}`}>{run.status}</span></td>
+              <td>{run.provider} / {run.model}</td>
+              <td>{run.schemaVersion}<small class="admin-table-subline">{run.promptVersion}</small></td>
+              <td>{run.runtimeMs === null ? '—' : `${run.runtimeMs} ms`}</td>
+              <td>{usage(run)}</td>
+              <td>{confidence(run)}</td>
+              <td>{run.errorMessage ?? '—'}</td>
+              <td><a class="admin-row-action" href={`/admin/analysis/${run.id}/`}>{run.status === 'succeeded' && !run.itemId ? 'Review' : 'Inspect'}</a></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      ) : (
+        <div class="admin-empty-state"><span>0</span><h2>No AI analyses</h2><p>Analyze one public URL to create the first versioned run.</p><a class="admin-inline-link" href="/admin/analyze/">Analyze URL →</a></div>
+      )}
+    </section>
+  )}
+</AdminLayout>

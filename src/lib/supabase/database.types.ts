@@ -79,6 +79,27 @@ export type Database = {
         metadata: Json;
         created_at: string;
       }>;
+      analysis_runs: TableDefinition<{
+        id: string;
+        item_id: string | null;
+        category_id: string | null;
+        source_url: string | null;
+        job_id: string | null;
+        provider: string;
+        model: string;
+        schema_version: string;
+        prompt_version: string;
+        status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        attempt: number;
+        started_at: string | null;
+        finished_at: string | null;
+        runtime_ms: number | null;
+        structured_result: Json | null;
+        raw_result: Json | null;
+        usage_metadata: Json;
+        error_message: string | null;
+        created_at: string;
+      }>;
       items: TableDefinition<
         TimestampedRow & {
           id: string;

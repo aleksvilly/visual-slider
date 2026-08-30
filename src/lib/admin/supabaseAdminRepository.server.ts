@@ -2,10 +2,16 @@ import { randomUUID } from 'node:crypto';
 import type { APIContext } from 'astro';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ExplorerCatalog } from '../catalog/repository';
+import {
+  ANALYSIS_PROMPT_VERSION,
+  ANALYSIS_SCHEMA_VERSION,
+} from '../analysis/openai.server';
+import type { AnalysisWorkflowFailure, AnalysisWorkflowSuccess } from '../analysis/types';
 import type { Database, Json } from '../supabase/database.types';
 import { createSupabaseAuthClient } from '../supabase/serverClient.server';
 import type {
   AdminCategory,
+  AdminAnalysisRun,
   AdminItemDetail,
   AdminItemInput,
   AdminItemSummary,
@@ -256,6 +262,150 @@ export class SupabaseAdminRepository {
       message: error.message,
       createdAt: error.created_at,
     }));
+  }
+
+  async createAnalysisRun(categoryId: string, sourceUrl: string, model: string) {
+    const attemptResult = await this.client
+      .from('analysis_runs')
+      .select('attempt')
+      .eq('category_id', categoryId)
+      .eq('source_url', sourceUrl)
+      .order('attempt', { ascending: false })
+      .limit(1);
+    operationError('Analysis attempt lookup failed', attemptResult.error);
+    const attempt = (attemptResult.data?.[0]?.attempt ?? 0) + 1;
+    const result = await this.client
+      .from('analysis_runs')
+      .insert({
+        item_id: null,
+        category_id: categoryId,
+        source_url: sourceUrl,
+        provider: 'openai',
+        model,
+        schema_version: ANALYSIS_SCHEMA_VERSION,
+        prompt_version: ANALYSIS_PROMPT_VERSION,
+        status: 'running',
+        attempt,
+        started_at: new Date().toISOString(),
+        raw_result: { source_url: sourceUrl, stage: 'metadata_fetch' },
+        usage_metadata: {},
+      })
+      .select('id')
+      .single();
+    operationError('Analysis run creation failed', result.error);
+    return result.data!.id;
+  }
+
+  async completeAnalysisRun(runId: string, result: AnalysisWorkflowSuccess) {
+    const finishedAt = new Date().toISOString();
+    const updateResult = await this.client
+      .from('analysis_runs')
+      .update({
+        status: 'succeeded',
+        model: result.analysis.model,
+        finished_at: finishedAt,
+        runtime_ms: result.runtimeMs,
+        structured_result: result.analysis.structured as unknown as Json,
+        raw_result: {
+          metadata: result.metadata,
+          openai: result.analysis.raw,
+        } as unknown as Json,
+        usage_metadata: result.analysis.usage,
+        error_message: null,
+      })
+      .eq('id', runId);
+    operationError('Analysis run completion failed', updateResult.error);
+  }
+
+  async failAnalysisRun(runId: string, failure: AnalysisWorkflowFailure) {
+    const result = await this.client
+      .from('analysis_runs')
+      .update({
+        status: 'failed',
+        finished_at: new Date().toISOString(),
+        runtime_ms: failure.runtimeMs,
+        raw_result: {
+          stage: failure.stage,
+          diagnostic: failure.raw,
+        } as Json,
+        error_message: failure.message,
+      })
+      .eq('id', runId);
+    operationError('Analysis failure could not be recorded', result.error);
+  }
+
+  async listAnalysisRuns(): Promise<AdminAnalysisRun[]> {
+    const [runResult, categories] = await Promise.all([
+      this.client
+        .from('analysis_runs')
+        .select(
+          'id, item_id, category_id, source_url, status, provider, model, schema_version, prompt_version, attempt, started_at, finished_at, runtime_ms, structured_result, raw_result, usage_metadata, error_message, created_at',
+        )
+        .order('created_at', { ascending: false }),
+      this.listCategories(),
+    ]);
+    operationError('Analysis run query failed', runResult.error);
+    const runs = runResult.data ?? [];
+    const itemIds = runs.flatMap((run) => run.item_id ? [run.item_id] : []);
+    const itemResult = itemIds.length
+      ? await this.client.from('items').select('id, title').in('id', itemIds)
+      : { data: [], error: null };
+    operationError('Analyzed item query failed', itemResult.error);
+    const itemTitleById = new Map((itemResult.data ?? []).map((item) => [item.id, item.title]));
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+
+    return runs.map((run) => {
+      const category = run.category_id ? categoryById.get(run.category_id) : undefined;
+      return {
+        id: run.id,
+        itemId: run.item_id,
+        itemTitle: run.item_id ? itemTitleById.get(run.item_id) ?? null : null,
+        categoryId: run.category_id,
+        categoryName: category?.name ?? 'Unknown category',
+        categorySlug: category?.slug ?? 'unknown',
+        sourceUrl: run.source_url,
+        status: run.status,
+        provider: run.provider,
+        model: run.model,
+        schemaVersion: run.schema_version,
+        promptVersion: run.prompt_version,
+        attempt: run.attempt,
+        startedAt: run.started_at,
+        finishedAt: run.finished_at,
+        runtimeMs: run.runtime_ms,
+        structuredResult: run.structured_result as unknown as AdminAnalysisRun['structuredResult'],
+        rawResult: run.raw_result,
+        usageMetadata: run.usage_metadata,
+        errorMessage: run.error_message,
+        createdAt: run.created_at,
+      };
+    });
+  }
+
+  async getAnalysisRun(runId: string) {
+    return (await this.listAnalysisRuns()).find((run) => run.id === runId) ?? null;
+  }
+
+  async saveAnalysisReview(runId: string, input: AdminItemInput) {
+    const run = await this.getAnalysisRun(runId);
+    if (!run || run.status !== 'succeeded' || !run.structuredResult) {
+      throw new Error('Only a successful analysis can be saved as a catalog item.');
+    }
+    if (run.categoryId !== input.categoryId) {
+      throw new Error('The review category must match the analyzed category.');
+    }
+    const imported = await this.manualImport(input);
+    const runResult = await this.client
+      .from('analysis_runs')
+      .update({ item_id: imported.itemId })
+      .eq('id', runId);
+    operationError('Analysis could not be linked to the item', runResult.error);
+    const valueResult = await this.client
+      .from('item_attribute_values')
+      .update({ analysis_run_id: runId, source: 'corrected' })
+      .eq('item_id', imported.itemId);
+    operationError('Reviewed attribute provenance could not be saved', valueResult.error);
+    return imported;
   }
 
   async getRankingCatalog(categorySlug: string): Promise<ExplorerCatalog | null> {

@@ -27,6 +27,7 @@ The domain model is generic so later categories can include bags, furniture, pos
 - Vue 3 islands
 - TypeScript
 - Supabase Postgres 17 and Supabase Auth
+- OpenAI Responses API for server-side semantic analysis
 - Provider-neutral server repository with a static seed fallback
 - Vercel server adapter
 - Protected Supabase-backed admin writes and Ranking Lab
@@ -63,16 +64,19 @@ Runtime variables:
 SUPABASE_PROJECT_REF
 SUPABASE_URL
 SUPABASE_PUBLISHABLE_KEY
+OPENAI_API_KEY
+OPENAI_ANALYSIS_MODEL
 ```
 
-`SUPABASE_SECRET_KEY` is privileged and optional for the current Vercel runtime. It is required only by the explicit Pants import command. Never prefix it with `PUBLIC_`, commit it, or expose it in browser code.
+`OPENAI_API_KEY` is required for **Analyze URL**. `OPENAI_ANALYSIS_MODEL` is optional and defaults to `gpt-5.6`. Both are server-only. `SUPABASE_SECRET_KEY` is privileged and optional for the current Vercel runtime; it is required only by the explicit Pants import command. Never prefix any secret with `PUBLIC_`, commit it, or expose it in browser code.
 
 ### Migration
 
-The single source-of-truth migration is:
+The ordered source-of-truth migrations are:
 
 ```text
 supabase/migrations/202608300001_phase_1_foundation.sql
+supabase/migrations/202608300002_url_analysis.sql
 ```
 
 Validate it locally without contacting Supabase:
@@ -81,7 +85,7 @@ Validate it locally without contacting Supabase:
 npm run validate:migration
 ```
 
-It is tested against an in-memory PostgreSQL 17 runtime, including anonymous denial, administrator create/edit/archive/delete, ingestion-run writes, and published-catalog visibility. The migration is already present in the connected production project; this admin slice does not add another migration or apply remote database changes.
+They are tested together against an in-memory PostgreSQL 17 runtime, including anonymous denial, administrator create/edit/archive/delete, pre-item analysis-run writes, ingestion-run writes, and published-catalog visibility. The second migration is required for URL-assisted analysis and must be applied after the deployed foundation migration. Repository migrations remain the source of truth; this implementation does not apply remote database changes.
 
 When you are ready to apply it, explicitly link the CLI to the existing project, confirm the ref, dry-run, and then push:
 
@@ -126,9 +130,11 @@ The user must sign in again after a role change so a fresh JWT contains the clai
 - `/admin` — protected database-backed operational dashboard
 - `/admin/items` — real catalog list with manual import, edit, archive, and delete workflows
 - `/admin/items/new` — generic category-driven Manual Import
+- `/admin/analyze` — SSRF-protected public-page metadata fetch plus synchronous OpenAI analysis
 - `/admin/sources`, `/admin/ingestion`, `/admin/errors` — real source and import observability
 - `/admin/categories`, `/admin/attributes` — current category-definition inspection
-- `/admin/analysis`, `/admin/duplicates` — explicit future-work empty states
+- `/admin/analysis` — versioned AI diagnostics, review, and failure retry
+- `/admin/duplicates` — explicit future-work empty state
 - `/admin/ranking` — category-selectable database Ranking Lab with score contributions
 
 ## Project structure
@@ -170,6 +176,8 @@ Slider values are preferences, not strict constraints. The engine should nearly 
 
 ## Current status
 
-Phase 1 now includes the deployed Postgres 17 foundation, a server-side Supabase repository, seed fallback, Vercel server output, protected admin routes, and the first authenticated write workflow. Manual Import is a small generic adapter: it upserts a shared manual source, records an ingestion run, creates or updates one canonical item, and writes the selected category's semantic values. Failed validation or persistence is retained in ingestion diagnostics.
+Phase 1 includes the deployed Postgres 17 foundation, a server-side Supabase repository, seed fallback, Vercel server output, protected admin routes, and authenticated catalog writes. Manual Import is a small generic adapter: it upserts a shared manual source, records an ingestion run, creates or updates one canonical item, and writes the selected category's semantic values. Failed validation or persistence is retained in ingestion diagnostics.
 
-All admin forms post to Astro SSR and use the signed-in user's Supabase cookie session, so normal RLS and the `app_metadata.role = admin` policy authorize every write. No service-role/secret key is used by these routes or shipped to the browser. External scraping and AI analysis remain unimplemented.
+The first Phase 2 AI slice adds one controlled URL-assisted path. An authenticated admin selects any configured category and submits one public URL. The server validates and fetches bounded public HTML metadata, calls the OpenAI Responses API with that category's enabled attributes, records the versioned result, and presents the existing generic item form for correction. No item is created or published until the admin explicitly saves the review.
+
+All admin forms post to Astro SSR and use the signed-in user's Supabase cookie session, so normal RLS and the `app_metadata.role = admin` policy authorize every write. Supabase privileged credentials and `OPENAI_API_KEY` are never used in browser code. Bulk crawling, background queues, embeddings, and automatic publication remain unimplemented.

@@ -12,7 +12,8 @@ Astro server build on Vercel
   │   ├─ Supabase Auth cookie session
   │   ├─ app_metadata.role = admin
   │   ├─ authenticated item writes + Manual Import
-  │   └─ real source/run/error views + Ranking Lab
+  │   ├─ public-URL metadata fetch + OpenAI analysis/review
+  │   └─ real source/run/error/analysis views + Ranking Lab
   ├─ Vue VisualExplorer + Ranking Lab islands
   │   └─ shared ranking.ts + score explanations
   └─ LocalStorage moodboard
@@ -25,7 +26,27 @@ versioned Postgres/Supabase migration
   └─ published catalog reads / authenticated admin management
 ```
 
-This is the first Phase 1/2 write slice. Runtime catalog reads, Vercel server output, and the admin authentication boundary are connected. Items can be manually imported, edited, archived, or deleted through Astro SSR forms; sources, runs, and errors are read from Postgres.
+Runtime catalog reads, Vercel server output, and the admin authentication boundary are connected. Items can be manually imported, edited, archived, or deleted through Astro SSR forms; sources, ingestion runs, errors, and analysis runs are read from Postgres. The first Phase 2 analysis slice runs synchronously for one URL and always stops at an editable review screen before catalog creation/publication.
+
+### URL-assisted analysis
+
+```text
+authenticated admin POST
+  → create running analysis_runs row through admin RLS
+  → validate public HTTP/HTTPS URL and resolve every DNS answer
+  → fetch DNS-pinned, bounded HTML (redirects revalidated)
+  → extract canonical/title/image/site/creator/structured price metadata
+  → OpenAI Responses API with dynamic category schema + optional public image URL
+  → store versioned result, usage, runtime, extraction diagnostics, or failure
+  → reuse generic item form for admin correction
+  → explicit draft / review / published save through existing item import path
+```
+
+The fetcher rejects credentials, localhost and private/reserved networks, non-HTML or compressed responses, more than three redirects, responses above 1.5 MB, and requests exceeding eight seconds. It sends no cookies or credentials and does not attempt to evade authentication, CAPTCHAs, paywalls, or anti-bot controls. DNS is pinned to an address that was validated before the connection, and redirect targets are independently validated.
+
+OpenAI uses `POST /v1/responses` server-side with strict JSON Schema output, `store: false`, and an optional low-detail image input. The schema is built from enabled attributes on the selected category; the analysis layer has no Pants-specific vocabulary. The default model is `gpt-5.6`, configurable through `OPENAI_ANALYSIS_MODEL`.
+
+The shared Vercel server function has a 60-second maximum duration. The metadata fetch has an absolute eight-second limit and the OpenAI request has a 45-second limit, leaving a small margin for authenticated database writes while keeping this first implementation synchronous.
 
 ## Target platform architecture
 
@@ -280,7 +301,7 @@ Turns canonical content/media into structured semantic attributes.
 
 Important properties:
 
-- asynchronous/background;
+- synchronous for the current single-item admin slice, with a background worker planned for volume;
 - server-side;
 - versioned;
 - retryable;

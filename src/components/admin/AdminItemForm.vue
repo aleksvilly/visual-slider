@@ -18,7 +18,7 @@ interface InitialValues {
 const props = withDefaults(
   defineProps<{
     categories: AdminCategory[];
-    mode: 'create' | 'edit';
+    mode: 'create' | 'edit' | 'review';
     initial?: InitialValues;
     errorMessage?: string;
   }>(),
@@ -56,7 +56,7 @@ function initialAttributeValue(attributeId: string, defaultValue: number) {
       <div class="admin-form-section-head">
         <div>
           <p class="eyebrow">Catalog identity</p>
-          <h2>{{ mode === 'create' ? 'Manual import' : 'Item details' }}</h2>
+          <h2>{{ mode === 'create' ? 'Manual import' : mode === 'review' ? 'Analysis review' : 'Item details' }}</h2>
         </div>
         <span>Required fields</span>
       </div>
@@ -169,7 +169,7 @@ function initialAttributeValue(attributeId: string, defaultValue: number) {
     <div class="admin-form-actions">
       <a href="/admin/items/">Cancel</a>
       <button type="submit" name="intent" value="save" :disabled="submitting">
-        {{ submitting ? 'Saving…' : mode === 'create' ? 'Import item' : 'Save changes' }}
+        {{ submitting ? 'Saving…' : mode === 'create' ? 'Import item' : mode === 'review' ? 'Save reviewed item' : 'Save changes' }}
       </button>
     </div>
   </form>

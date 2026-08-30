@@ -28,7 +28,10 @@ const formatDate = (value: string) => new Intl.DateTimeFormat('en', {
       <h1>Items</h1>
       <p>All item types use the same category-scoped attribute model and source identity fields.</p>
     </div>
-    <a class="admin-primary-action" href="/admin/items/new/">Manual import</a>
+    <div class="admin-head-actions">
+      <a class="admin-secondary-action" href="/admin/analyze/">Analyze URL</a>
+      <a class="admin-primary-action" href="/admin/items/new/">Manual import</a>
+    </div>
   </header>
 
   {deleted && <p class="admin-form-message admin-form-success" role="status">Item deleted.</p>}

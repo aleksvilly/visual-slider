@@ -2,7 +2,7 @@
 
 ## Phase 1 persistence
 
-The initial Postgres schema is versioned in `supabase/migrations/202608300001_phase_1_foundation.sql`. It is deployed to the connected `yzayxussrpreiyknlnhi` project and remains the schema source of truth. It is also executed locally against PostgreSQL 17.5 for policy and write-workflow validation. This slice requires no additional migration.
+The initial Postgres schema is versioned in `supabase/migrations/202608300001_phase_1_foundation.sql`. The URL-analysis extension is versioned in `supabase/migrations/202608300002_url_analysis.sql`. Migrations are the schema source of truth and are executed in order locally against PostgreSQL 17.5 for policy and workflow validation. The second migration must be applied to production before deploying the URL-assisted admin routes.
 
 Implemented relations:
 
@@ -13,6 +13,13 @@ Implemented relations:
 - versioned `analysis_runs` with structured/raw results, usage metadata, and retry attempt;
 - `duplicate_candidates` for a reviewable deduplication decision;
 - `admin_metadata` for small platform-level operational settings.
+
+The URL-analysis migration lets `analysis_runs.item_id` remain null until administrator review, then adds:
+
+- `category_id`, so the dynamic analysis schema is reproducible before an item exists;
+- `source_url`, so failed fetches and retries remain attributable;
+- `runtime_ms`, for admin diagnostics;
+- a subject check requiring either an item or source URL.
 
 All semantic values and defaults are constrained to `0..100`. Composite foreign keys ensure an item attribute belongs to the same category as both its item and definition. Source/external identity is unique only when both identifiers exist, so source-less manual items do not collide.
 
@@ -116,6 +123,12 @@ Manual Import uses the existing generic relations rather than Pants-specific col
 - a failed run plus `ingestion_errors` detail for validation/persistence failures.
 
 Create and edit forms store numeric price/currency when supplied and keep publication state separate from semantic values. Archive changes `publication_status`; permanent delete relies on existing foreign-key cascades for item values. All operations use the authenticated user and existing RLS policies, not a service-role client.
+
+## URL-assisted analysis and review
+
+Each Analyze URL submission creates an `analysis_runs` row before network access. Attempts for the same category/source are incremented. A successful row stores provider/model, schema and prompt versions, normalized structured attributes, bounded extraction/OpenAI diagnostics, token usage when returned, runtime, and completion state. A failed row stores its stage (`metadata_fetch`, `openai`, or `persist`) and error without creating an item.
+
+Successful analysis is still not a catalog item. The review page maps category attribute keys back to their definition IDs and reuses the generic item form. Saving invokes the existing observable Manual Import write path, then links `analysis_runs.item_id` and records reviewed attribute provenance through `item_attribute_values.analysis_run_id`. The administrator explicitly chooses `draft`, `review`, or `published`; the default is `review`.
 
 ## Important rule
 

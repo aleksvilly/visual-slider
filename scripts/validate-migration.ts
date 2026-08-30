@@ -1,11 +1,10 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 
-const migrationPath = new URL(
-  '../supabase/migrations/202608300001_phase_1_foundation.sql',
-  import.meta.url,
-);
-const migration = await readFile(migrationPath, 'utf8');
+const migrationsDirectory = new URL('../supabase/migrations/', import.meta.url);
+const migrationNames = (await readdir(migrationsDirectory))
+  .filter((name) => name.endsWith('.sql'))
+  .sort();
 const db = new PGlite();
 
 await db.exec(`
@@ -27,7 +26,9 @@ await db.exec(`
   grant execute on function auth.jwt() to anon, authenticated;
 `);
 
-await db.exec(migration);
+for (const migrationName of migrationNames) {
+  await db.exec(await readFile(new URL(migrationName, migrationsDirectory), 'utf8'));
+}
 
 const version = await db.query<{ server_version: string }>('show server_version');
 const tables = await db.query<{ count: number }>(`
@@ -172,6 +173,14 @@ await db.exec(`
   join public.categories on categories.id = items.category_id
   join public.attribute_definitions attributes on attributes.category_id = categories.id
   where items.public_id = 'admin-created-item' and attributes.key = 'test-attribute';
+
+  insert into public.analysis_runs (
+    item_id, category_id, source_url, provider, model, schema_version,
+    prompt_version, status, started_at
+  )
+  select null, id, 'https://example.com/analyzed-item', 'openai', 'test-model',
+    'semantic-attributes-v1', 'url-metadata-vision-v1', 'running', now()
+  from public.categories where slug = 'published-test';
 `);
 
 await db.exec('reset role; set role anon');
@@ -225,7 +234,7 @@ await db.exec(`
 
 await db.close();
 console.log(
-  `Validated ${migrationPath.pathname.split('/').at(-1)} on PostgreSQL ${version.rows[0]?.server_version}: ` +
+  `Validated ${migrationNames.join(', ')} on PostgreSQL ${version.rows[0]?.server_version}: ` +
     `${tables.rows[0]?.count} tables, ${rlsTables.rows[0]?.count} RLS-enabled, ${policies.rows[0]?.count} policies; ` +
     'admin create/edit/archive/delete and public visibility checks passed.',
 );

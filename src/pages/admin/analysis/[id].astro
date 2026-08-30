@@ -1,0 +1,123 @@
+---
+import AdminItemForm from '../../../components/admin/AdminItemForm.vue';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { analysisReviewInitial, extractedMetadataFromRun } from '../../../lib/analysis/review';
+import { assertSameOrigin, parseAdminItemForm } from '../../../lib/admin/itemForm.server';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminAnalysisRun, AdminCategory } from '../../../lib/admin/types';
+
+const runId = Astro.params.id ?? '';
+let repository: Awaited<ReturnType<typeof createSupabaseAdminRepository>> | null = null;
+let categories: AdminCategory[] = [];
+let run: AdminAnalysisRun | null = null;
+let loadError = '';
+let errorMessage = '';
+let submittedInitial: Record<string, unknown> | undefined;
+
+try {
+  repository = await createSupabaseAdminRepository(Astro);
+  categories = await repository.listCategories();
+  run = await repository.getAnalysisRun(runId);
+} catch (error) {
+  loadError = error instanceof Error ? error.message : 'The analysis run could not be loaded.';
+}
+
+if (Astro.request.method === 'POST' && repository && run?.status === 'succeeded' && !run.itemId) {
+  try {
+    assertSameOrigin(Astro.request);
+    const formData = await Astro.request.formData();
+    const input = parseAdminItemForm(formData, categories);
+    submittedInitial = {
+      categoryId: input.categoryId,
+      title: input.title,
+      sourceUrl: input.sourceUrl,
+      imageUrl: input.imageUrl,
+      creator: input.creator ?? '',
+      sourceSite: input.sourceSite,
+      priceAmount: input.priceAmount,
+      priceCurrency: input.priceCurrency ?? '',
+      publicationStatus: input.publicationStatus,
+      attributes: input.attributeValues,
+    };
+    const saved = await repository.saveAnalysisReview(runId, input);
+    if (!saved.itemId) throw new Error('The reviewed item returned no ID.');
+    return Astro.redirect(`/admin/items/${saved.itemId}/?analyzed=1`, 303);
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'The reviewed item could not be saved.';
+    run = await repository.getAnalysisRun(runId);
+  }
+}
+
+if (!run) Astro.response.status = loadError ? 500 : 404;
+const category = run?.categoryId ? categories.find((candidate) => candidate.id === run!.categoryId) : null;
+const metadata = run ? extractedMetadataFromRun(run) : null;
+let reviewInitial: Record<string, unknown> | null = null;
+if (run?.status === 'succeeded' && category && !run.itemId) {
+  try { reviewInitial = analysisReviewInitial(run, category); } catch (error) {
+    errorMessage ||= error instanceof Error ? error.message : 'Analysis result is not reviewable.';
+  }
+}
+const retryUrl = run?.sourceUrl && run.categoryId
+  ? `/admin/analyze/?sourceUrl=${encodeURIComponent(run.sourceUrl)}&category=${encodeURIComponent(run.categoryId)}`
+  : '/admin/analyze/';
+const usage = run?.usageMetadata && typeof run.usageMetadata === 'object' && !Array.isArray(run.usageMetadata)
+  ? run.usageMetadata as Record<string, unknown>
+  : {};
+const structuredResult = run?.structuredResult ?? null;
+const linkedItemId = run?.itemId ?? null;
+const runStatus = run?.status ?? '';
+const rawResult = run?.rawResult ?? null;
+const analysisErrorMessage = run?.errorMessage ?? '';
+const failureStage = rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
+  ? String((rawResult as Record<string, unknown>).stage ?? 'analysis')
+  : 'analysis';
+---
+
+<AdminLayout title="Analysis detail" activeSection="analysis" description="Inspect, retry, or review one versioned semantic analysis.">
+  {run ? (
+    <>
+      <header class="admin-page-head">
+        <div><p class="eyebrow">{run?.categoryName} · attempt {run?.attempt}</p><h1>Analysis detail</h1><p>{run?.sourceUrl}</p></div>
+        <span class={`admin-status admin-status-${runStatus}`}>{runStatus}</span>
+      </header>
+
+      <section class="ranking-summary admin-analysis-summary">
+        <div><dt>Model</dt><dd>{run?.model}</dd></div>
+        <div><dt>Runtime</dt><dd>{run?.runtimeMs === null ? '—' : `${run?.runtimeMs} ms`}</dd></div>
+        <div><dt>Total tokens</dt><dd>{String(usage.total_tokens ?? '—')}</dd></div>
+        <div><dt>Version</dt><dd>{run?.schemaVersion}<small>{run?.promptVersion}</small></dd></div>
+      </section>
+
+      {analysisErrorMessage && <section class="admin-error-state" role="alert"><p class="eyebrow">{failureStage} failure</p><h2>Analysis failed</h2><p>{analysisErrorMessage}</p><a href={retryUrl}>Retry this URL →</a></section>}
+
+      {structuredResult && (
+        <section class="admin-form-section admin-analysis-result">
+          <div class="admin-form-section-head"><div><p class="eyebrow">Model summary</p><h2>{structuredResult.detected_title || metadata?.title}</h2></div><span>{structuredResult.detected_product_type}</span></div>
+          <p>{structuredResult.summary}</p>
+          <div class="admin-analysis-attributes">
+            {structuredResult.attributes.map((attribute) => (
+              <article><header><strong>{attribute.attribute_key}</strong><span>{Math.round(attribute.value)} / 100</span></header><small>{Math.round(attribute.confidence * 100)}% confidence</small><p>{attribute.reason}</p></article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {linkedItemId ? (
+        <section class="admin-callout"><strong>Review saved</strong><p>This analysis is linked to a catalog item. Continue metadata or publication edits on the item page. <a class="admin-inline-link" href={`/admin/items/${linkedItemId}/`}>Open item →</a></p></section>
+      ) : reviewInitial && category ? (
+        <section class="admin-analysis-review">
+          <header><p class="eyebrow">Administrator review</p><h2>Correct before saving</h2><p>Nothing has been published yet. Review metadata and every semantic value, then choose draft, review, or published.</p></header>
+          <AdminItemForm client:load mode="review" categories={categories} initial={submittedInitial ?? reviewInitial} {errorMessage} />
+        </section>
+      ) : runStatus === 'failed' ? (
+        <p class="admin-form-note">Retry the URL to create a new versioned attempt. Failed analysis does not create a catalog item.</p>
+      ) : null}
+
+      <details class="ranking-raw-values admin-analysis-raw"><summary>Raw extraction / response diagnostics</summary><pre>{JSON.stringify(rawResult, null, 2)}</pre></details>
+    </>
+  ) : loadError ? (
+    <section class="admin-error-state" role="alert"><p class="eyebrow">Database error</p><h1>Analysis could not be loaded</h1><p>{loadError}</p><a href={`/admin/analysis/${runId}/`}>Try again</a></section>
+  ) : (
+    <section class="admin-error-state"><p class="eyebrow">404</p><h1>Analysis not found</h1><p>The requested analysis run does not exist.</p><a href="/admin/analysis/">Back to analyses</a></section>
+  )}
+</AdminLayout>

@@ -45,7 +45,7 @@ The first incremental foundation slice is implemented:
 - [x] add a generic one-item Manual Import with category-driven attributes and run/error observability;
 - [ ] add authenticated category, attribute, and source configuration write actions.
 
-Production now serves the seeded Pants catalog from Supabase. The first admin write path uses the authenticated user and existing RLS policies; no privileged runtime key, external ingestion, or AI analysis is implied.
+Production serves the seeded Pants catalog from Supabase. Admin writes use the authenticated user and existing RLS policies; no privileged Supabase runtime key is required.
 
 ### Database
 
@@ -128,14 +128,18 @@ Potential adapter families later:
 
 ### AI analysis
 
-- server-side OpenAI integration;
-- structured category-specific analysis schema;
-- image + text metadata analysis where appropriate;
-- version prompt/schema/model configuration;
-- async job state and retries;
-- store structured attributes in the canonical catalog;
-- allow admin re-analysis of an item or batch;
-- track approximate usage/cost metadata where practical.
+- [x] add a synchronous, single-item Analyze URL action for authenticated administrators;
+- [x] fetch bounded public HTML metadata with redirect-aware SSRF protection;
+- [x] add server-side OpenAI Responses API integration with no browser key;
+- [x] generate strict structured output from the selected category's enabled attributes;
+- [x] use extracted text metadata plus a public image URL when available;
+- [x] version provider/model/schema/prompt and store structured/raw diagnostics;
+- [x] record runtime, token usage when returned, confidence, and failures;
+- [x] reuse the generic item form for correction and explicit draft/review/published save;
+- [x] expose analysis diagnostics and retry links in admin;
+- [ ] move analysis to async job state/worker execution when volume requires it;
+- [ ] allow admin re-analysis of an existing item or a batch;
+- [ ] track approximate cost metadata when pricing policy is defined.
 
 AI analysis should happen at ingestion/re-analysis time, not on every slider movement.
 

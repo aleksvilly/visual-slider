@@ -1,3 +1,5 @@
+import type { Json } from '../supabase/database.types';
+
 export type PublicationStatus = 'draft' | 'review' | 'published' | 'rejected' | 'archived';
 
 export interface AdminAttribute {
@@ -102,5 +104,29 @@ export interface AdminIngestionError {
   stage: string;
   code: string | null;
   message: string;
+  createdAt: string;
+}
+
+export interface AdminAnalysisRun {
+  id: string;
+  itemId: string | null;
+  itemTitle: string | null;
+  categoryId: string | null;
+  categoryName: string;
+  categorySlug: string;
+  sourceUrl: string | null;
+  status: string;
+  provider: string;
+  model: string;
+  schemaVersion: string;
+  promptVersion: string;
+  attempt: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  runtimeMs: number | null;
+  structuredResult: import('../analysis/types').StructuredSemanticAnalysis | null;
+  rawResult: Json | null;
+  usageMetadata: Json;
+  errorMessage: string | null;
   createdAt: string;
 }
