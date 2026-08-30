@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+const base = import.meta.env.BASE_URL;
 ---
 
 <BaseLayout title="Visual Slider — visual discovery by sliders">
@@ -11,7 +13,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       No prompt engineering required.
     </p>
     <div class="hero-actions">
-      <a class="primary-button" href="/pants">Open Pants prototype</a>
+      <a class="primary-button" href={`${base}pants`}>Open Pants prototype</a>
       <a class="text-button" href="https://github.com/aleksvilly/visual-slider" target="_blank" rel="noreferrer">View repository ↗</a>
     </div>
   </section>
@@ -44,7 +46,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <p class="eyebrow">First validation category</p>
       <h2>Fashion / Pants</h2>
     </div>
-    <a class="category-card" href="/pants">
+    <a class="category-card" href={`${base}pants`}>
       <strong>6 semantic sliders</strong>
       <span>Soft ranking · Explore this · Moodboard</span>
       <b>OPEN →</b>
