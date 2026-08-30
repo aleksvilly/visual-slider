@@ -10,6 +10,8 @@ const {
   title,
   description = 'Visual Slider — search existing visual references by feeling, not vocabulary.',
 } = Astro.props;
+
+const base = import.meta.env.BASE_URL;
 ---
 
 <!doctype html>
@@ -23,9 +25,9 @@ const {
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="/">VISUAL / SLIDER</a>
+      <a class="brand" href={base}>VISUAL / SLIDER</a>
       <nav>
-        <a href="/pants">Pants prototype</a>
+        <a href={`${base}pants`}>Pants prototype</a>
         <a href="https://github.com/aleksvilly/visual-slider" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
     </header>
