@@ -4,88 +4,207 @@ Instructions for coding agents working on Visual Slider.
 
 ## Product contract
 
-Visual Slider is primarily a **discovery and ranking product**, not an image generator.
+Visual Slider is a **discovery and ranking platform**. Its core experience is not prompt-first generation and not a traditional faceted-filter catalog.
 
-The core loop is:
+The product loop is:
 
-1. Existing visual items are indexed.
-2. Offline analysis produces numerical semantic attributes + later embeddings.
-3. Users express visual intent through intuitive sliders.
-4. Results are softly re-ranked by closeness.
-5. Users can open the original source, save references, and later export/share a moodboard.
+1. Existing items, places, products, references, or other discoverable entities are ingested from configured sources.
+2. Data is normalized into a shared catalog model.
+3. Offline analysis produces structured semantic attributes and, where useful, embeddings.
+4. Users express intent through intuitive sliders plus optional hard constraints.
+5. Results are continuously re-ranked by closeness.
+6. Users can open the original source, save references, build a moodboard/list, or use a category-specific action.
 
-Do not accidentally turn the MVP into a prompt-first generator or a traditional faceted-filter ecommerce site.
+Examples:
 
-## Current validation question
+- Pants: normal ↔ square, slim ↔ huge, casual ↔ business.
+- Wine: light ↔ bold, dry ↔ sweet, easy ↔ complex, classic ↔ unusual.
+- Travel: calm ↔ adrenaline, city ↔ nature, popular ↔ hidden, plus hard limits such as budget, dates, duration, and travel time.
 
-Can semantic sliders feel more natural and useful than text search for visual discovery?
+The shared engine must support very different categories without forking the application into separate products.
 
-Everything in MVP 0.1 should support answering that question.
+## Current development phase
+
+The static `/pants` MVP proved the basic interaction can be implemented. The project may now add the platform foundation needed for real catalogs:
+
+- Postgres-backed data model;
+- admin panel;
+- categories and attribute management;
+- catalog/source management;
+- source adapters and controlled ingestion;
+- ingestion jobs and logs;
+- offline AI analysis;
+- analysis versioning and re-analysis;
+- ranking inspection/debugging;
+- support for multiple categories.
+
+Do not preserve old MVP restrictions that forbid database, admin, or ingestion work. Those are now in scope.
 
 ## Technical principles
 
 - Keep the catalog/category model generic.
-- Category-specific behavior belongs in data definitions, not duplicated UI.
-- Sliders are preferences, not hard filters.
-- Missing attributes should degrade gracefully.
-- Preserve source attribution and source URLs.
-- Keep the front end usable without a backend during MVP validation.
-- Avoid premature infrastructure: auth, payments, marketplace logic, vector DBs, queues, and production ingestion are future work.
+- Category-specific behavior belongs in configuration/data and small strategy modules, not duplicated applications.
+- Never hard-code the ranking engine around Pants, Wine, Travel, or any other category.
+- Normalize continuous semantic attributes to a consistent range such as `0..100`.
+- Separate **soft preferences** from **hard constraints**.
+- Soft sliders should rank by closeness rather than eliminate most results.
+- Hard constraints are appropriate for genuinely bounded fields such as price ceiling, dates, availability, duration, or maximum travel time.
+- Missing attributes must degrade gracefully.
+- Preserve source attribution, canonical source URL, and source identity as first-class data.
+- Keep domain/ranking logic pure and testable where possible.
+- OpenAI or other AI calls belong in server-side/background analysis, not in the slider interaction loop.
+- Never expose API keys in client code.
+- Prefer a shared normalizer after source adapters so source-specific parsing does not leak into the catalog model.
+- Build observability into ingestion from the beginning: status, counts, failures, last run, parser version, and logs.
 
-## First category
+## Working infrastructure direction
 
-`Fashion → Pants` is the first validation category only. Do not hard-code the ranking engine around pants semantics.
+Current working direction:
 
-Future categories may include:
+- Astro + Vue for the web experience;
+- Vercel as the primary web/API deployment target;
+- Postgres as the source of truth;
+- Supabase is the preferred initial managed Postgres/Auth/Storage option unless implementation constraints justify another provider;
+- long-running or high-volume ingestion must be isolated from normal request/response handlers and may later move to dedicated workers.
 
-- bags / backpacks
-- furniture / mirrors / rugs / lamps
-- posters / booklets / packaging
-- cakes / bouquets
-- hair / nails / tattoos
-- interiors
-- jewelry / glasses
+Keep provider-specific code behind small adapters where practical so core catalog and ranking logic are not tied to one host.
 
-Each category can define its own slider attributes while sharing the same engine.
+## Admin panel is a product requirement
 
-## Data policy during prototype phase
+The admin area is not an afterthought. It should make the system understandable and operable without reading server logs.
 
-Seed data may contain external references for interface testing, but:
+Minimum administrative domains:
 
-- always preserve the original source URL and source site;
-- never present external work as owned by Visual Slider;
-- distinguish demo/synthetic items from real indexed references;
-- production ingestion and display rights need source-specific rules later.
+- Dashboard
+- Categories
+- Attributes / slider definitions
+- Items
+- Sources
+- Ingestion runs/jobs
+- AI analysis runs
+- Errors
+- Duplicates / review queue
+- Ranking Lab
+
+### Ranking Lab
+
+Ranking Lab should let an administrator select a category, set sliders/constraints, inspect the ordered results, and understand why an item received its score.
+
+Prefer exposing score components such as:
+
+- semantic attribute distance;
+- embedding similarity when enabled;
+- hard-constraint pass/fail;
+- category weights;
+- missing-data penalties;
+- later quality/diversity bonuses.
+
+Do not make ranking behavior a black box if a simple explanation can be shown.
+
+## Source adapters and ingestion
+
+Do not build one giant scraper.
+
+Use source adapters with a shared contract, for example:
+
+```text
+source adapter
+  → raw source item
+  → normalizer
+  → canonical item
+  → deduplication
+  → AI analysis
+  → review/publish
+```
+
+Potential adapter families may include:
+
+- structured partner/API feeds;
+- Shopify-like commerce sources;
+- generic public HTML sources;
+- creator uploads;
+- wine data sources;
+- travel/location APIs;
+- manually curated imports.
+
+Do not bypass authentication, paywalls, CAPTCHAs, or technical anti-bot protections. Source display/rehosting policy remains source-specific; preserving a link does not automatically grant rights to republish third-party media.
 
 See `docs/SOURCES.md`.
 
+## AI analysis
+
+AI analysis should be reproducible and versioned.
+
+Store enough metadata to know:
+
+- model/provider;
+- analysis schema version;
+- prompt/config version;
+- run/job ID;
+- timestamp;
+- raw or normalized result where appropriate;
+- failure/retry state.
+
+Prefer structured output that maps directly into category attributes. Re-analysis must not require rewriting source adapters.
+
 ## Ranking
 
-The initial ranker is deliberately simple: weighted normalized absolute distance over defined slider attributes.
+The initial semantic ranker is deliberately simple: weighted normalized distance over defined slider attributes.
 
-Do not add complex ML ranking until we have interaction data proving it is necessary.
+As the platform grows, ranking may blend multiple signals, for example:
+
+```text
+final score =
+  semantic attribute score
+  + optional embedding similarity
+  + category-specific quality/availability signals
+  + diversity adjustment
+```
+
+Hard constraints are evaluated separately from soft preference scoring.
+
+Do not add complex ML ranking merely because infrastructure exists. Add complexity only when it improves real discovery quality.
 
 See `docs/SLIDER_RANKING.md`.
 
-## Definition of done for MVP 0.1
+## Category expansion
 
-- `/pants` loads without a backend.
-- All sliders visibly change result order.
-- `Explore this` sets slider values from an item's attributes.
-- Save/remove moodboard state survives refresh via LocalStorage.
-- Every external reference exposes its original source.
-- Mobile layout remains usable.
+`Fashion → Pants` remains the first implementation reference, not the product boundary.
 
-## Out of scope for now
+Useful validation categories include:
 
-- AI generation of new designs
-- production-ready sewing/CAD files
-- automatic crawling of the entire web
-- login/accounts
-- payments
-- creator marketplace
-- automated licensing
-- production partner dispatch
-- maker quote system
+- fashion / bags / shoes / eyewear;
+- furniture / lamps / mirrors / rugs;
+- posters / booklets / packaging;
+- cakes / bouquets;
+- hair / nails / tattoos;
+- interiors;
+- wine;
+- travel destinations / experiences / locations.
 
-Document proposals for these instead of implementing them unless the project owner explicitly changes scope.
+A new category should mostly require category schema/configuration, source data, and possibly a small constraint strategy. It should not require copying the explorer or ranking engine.
+
+## Definition of done for the next platform phase
+
+- Existing `/pants` prototype remains functional.
+- A database-backed catalog can serve the same explorer contract as the current seed data.
+- Categories and attributes can be inspected and edited from admin.
+- Sources can be enabled/disabled and their ingestion status is visible.
+- At least one source adapter can import items through the shared normalization pipeline.
+- AI analysis can run asynchronously and store versioned structured attributes.
+- Ranking Lab can reproduce a user query and show score components.
+- No secret/API key is shipped to the browser.
+- Deployment remains reproducible from GitHub.
+
+## Still out of scope unless explicitly requested
+
+- AI generation as the default discovery experience;
+- production-ready sewing/CAD/manufacturing files;
+- payments;
+- full creator marketplace;
+- automated licensing contracts;
+- maker quote/dispatch workflow;
+- indiscriminate crawling of the entire web;
+- infrastructure complexity without a concrete current use case.
+
+When architecture decisions change, update the relevant docs in the same work rather than leaving Codex or future agents with contradictory instructions.
