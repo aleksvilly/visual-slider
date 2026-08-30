@@ -1,0 +1,27 @@
+---
+import RankingLab from '../../components/admin/RankingLab.vue';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServerCatalogRepository } from '../../lib/catalog/serverRepository.server';
+
+const catalog = await getServerCatalogRepository().getExplorerCatalog('pants');
+
+if (!catalog) {
+  throw new Error('The Pants catalog is not configured.');
+}
+---
+
+<AdminLayout
+  title="Ranking Lab"
+  activeSection="ranking"
+  description="Inspect the score components produced by the shared Visual Slider ranking core."
+>
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">Shared ranking core</p>
+      <h1>Ranking Lab</h1>
+      <p>Reproduce a public query, inspect the ordered results, and see exactly how each active attribute contributes.</p>
+    </div>
+    <span class="admin-mode">{catalog.origin === 'postgres' ? 'Postgres catalog' : 'Seed fallback'}</span>
+  </header>
+  <RankingLab client:load category={catalog.category} items={catalog.items} />
+</AdminLayout>

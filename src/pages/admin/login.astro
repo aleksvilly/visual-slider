@@ -1,0 +1,80 @@
+---
+import '../../styles/global.css';
+import { createSupabaseAuthClient } from '../../lib/supabase/serverClient.server';
+
+let errorMessage = '';
+const supabase = createSupabaseAuthClient(Astro);
+const safeAdminReturnTo = (value: string | null) =>
+  value?.startsWith('/admin') && !value.startsWith('//') ? value : '/admin/';
+const requestedReturnTo = Astro.url.searchParams.get('returnTo');
+const returnTo = safeAdminReturnTo(requestedReturnTo);
+
+if (Astro.request.method === 'POST') {
+  if (!supabase) {
+    errorMessage = 'Supabase is not configured for this environment.';
+  } else {
+    const formData = await Astro.request.formData();
+    const email = String(formData.get('email') ?? '').trim();
+    const password = String(formData.get('password') ?? '');
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      errorMessage = 'The email or password is incorrect.';
+    } else if (data.user.app_metadata?.role !== 'admin') {
+      await supabase.auth.signOut();
+      errorMessage = 'This account does not have administrator access.';
+    } else {
+      return Astro.redirect(
+        safeAdminReturnTo(String(formData.get('returnTo') ?? '')),
+        303,
+      );
+    }
+  }
+} else if (supabase) {
+  const { data } = await supabase.auth.getUser();
+  if (data.user?.app_metadata?.role === 'admin') {
+    return Astro.redirect(returnTo, 303);
+  }
+}
+
+const reason = Astro.url.searchParams.get('reason');
+if (!errorMessage && reason === 'unconfigured') {
+  errorMessage = 'Supabase is not configured. Add the server-side environment variables to enable admin login.';
+} else if (!errorMessage && reason === 'forbidden') {
+  errorMessage = 'Your signed-in account does not have administrator access.';
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="Visual Slider administrator sign in" />
+    <title>Admin sign in — Visual Slider</title>
+  </head>
+  <body class="admin-login-body">
+    <main class="admin-login-shell">
+      <a class="brand" href="/">VISUAL / SLIDER</a>
+      <section class="admin-login-card">
+        <p class="eyebrow">Protected administration</p>
+        <h1>Admin sign in</h1>
+        <p>Use the single administrator account configured in Supabase Auth.</p>
+        {errorMessage && <p class="admin-login-error" role="alert">{errorMessage}</p>}
+        <form method="post">
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Sign in</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

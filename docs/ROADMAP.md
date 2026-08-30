@@ -19,6 +19,31 @@ The purpose of Phase 0 was to prove the basic slider-driven interaction, not to 
 
 The next phase moves Visual Slider from static seed data to an operable catalog platform while keeping the existing `/pants` experience working.
 
+### Implementation status — 2026-08-30
+
+The first incremental foundation slice is implemented:
+
+- [x] add a versioned Postgres/Supabase migration for categories, category attributes, sources, items, item attributes, ingestion runs/errors, analysis runs, duplicate candidates, and admin metadata;
+- [x] enforce normalized attribute ranges and preserve canonical source identity in the schema;
+- [x] add row-level security with public reads limited to published catalog data;
+- [x] introduce a provider-neutral catalog repository contract;
+- [x] route `/pants` through the checked-in repository fallback so the existing static prototype remains functional;
+- [x] add all required `/admin` inspection routes with explicit operational empty states;
+- [x] add a Ranking Lab that uses the same ranking implementation as the public explorer and exposes weighted-distance components;
+- [x] validate the migration locally on PostgreSQL 17.5, including representative anonymous/admin RLS checks;
+- [x] make table grants explicit and add one trusted `app_metadata.role = admin` authorization path;
+- [x] connect a server-side Supabase/Postgres repository and use it for `/pants` when configured;
+- [x] preserve the checked-in Pants repository fallback when Supabase variables are absent;
+- [x] add an idempotent Pants seed/import script with ingestion-run observability;
+- [x] add protected Supabase Auth admin routes with cookie sessions and no-store responses;
+- [x] add Vercel server output and replace the GitHub Pages deploy workflow with server-build verification;
+- [x] document the exact project-bound environment variables and manual Auth setup;
+- [ ] apply the source-of-truth migration to the existing `yzayxussrpreiyknlnhi` project;
+- [ ] run the Pants seed import against that explicitly configured project;
+- [ ] add authenticated server-side category, attribute, item, and source write actions.
+
+The migration and repository were not run remotely because this workspace had no explicit Supabase link or environment configuration. The read-only admin deliberately does not imply that external ingestion or AI analysis has run; those remain Phase 2 work.
+
 ### Database
 
 - introduce Postgres as the source of truth;
@@ -57,7 +82,7 @@ The admin UI should answer practical questions without requiring direct database
 - keep GitHub-based deployments reproducible;
 - move the full application/API to Vercel when server functionality is introduced;
 - keep provider-specific infrastructure isolated from core ranking/domain code;
-- keep the static GitHub Pages deployment only as long as it remains useful for the prototype/demo.
+- retire the static GitHub Pages workflow once authenticated server functionality is introduced.
 
 ## Phase 2 — ingestion + AI analysis
 

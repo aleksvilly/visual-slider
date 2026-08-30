@@ -3,19 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "validate:migration": "node --import tsx scripts/validate-migration.ts",
+    "seed:pants": "node --import tsx scripts/seed-pants.ts"
   },
   "dependencies": {
-    "@astrojs/vue": "^5.0.0",
-    "astro": "^5.0.0",
-    "vue": "^3.5.0"
+    "@astrojs/vercel": "11.0.8",
+    "@astrojs/vue": "7.0.2",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4",
+    "astro": "7.2.9",
+    "vue": "3.5.24"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.0",
+    "@electric-sql/pglite": "^0.4.5",
+    "@types/node": "^26.4.0",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.0"
+  },
+  "overrides": {
+    "path-to-regexp": "6.3.0"
   }
 }

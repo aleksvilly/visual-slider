@@ -1,8 +1,9 @@
 import { defineConfig } from 'astro/config';
+import vercel from '@astrojs/vercel';
 import vue from '@astrojs/vue';
 
 export default defineConfig({
-  site: 'https://aleksvilly.github.io',
-  base: '/visual-slider/',
+  output: 'server',
+  adapter: vercel(),
   integrations: [vue()],
 });

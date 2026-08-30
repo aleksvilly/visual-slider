@@ -15,6 +15,7 @@ const base = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
 const pantsUrl = `${base}pants/`;
+const adminUrl = `${base}admin/`;
 ---
 
 <!doctype html>
@@ -31,6 +32,7 @@ const pantsUrl = `${base}pants/`;
       <a class="brand" href={base}>VISUAL / SLIDER</a>
       <nav>
         <a href={pantsUrl}>Pants prototype</a>
+        <a href={adminUrl}>Platform admin</a>
         <a href="https://github.com/aleksvilly/visual-slider" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
     </header>

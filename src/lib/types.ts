@@ -20,6 +20,8 @@ export interface CategoryDefinition {
 export interface CatalogItem {
   id: string;
   categoryId: string;
+  sourceId?: string;
+  sourceExternalId?: string;
   title: string;
   creator?: string;
   sourceSite: string;
@@ -34,6 +36,29 @@ export interface CatalogItem {
 export interface RankedItem {
   item: CatalogItem;
   score: number;
+}
+
+export interface AttributeScoreComponent {
+  key: AttributeKey;
+  label: string;
+  preference: number;
+  itemValue?: number;
+  weight: number;
+  distance?: number;
+  weightedDistance?: number;
+  missing: boolean;
+}
+
+export interface ScoreExplanation {
+  score: number;
+  averageDistance?: number;
+  totalWeight: number;
+  components: AttributeScoreComponent[];
+  missingAttributes: AttributeKey[];
+}
+
+export interface ExplainedRankedItem extends RankedItem {
+  explanation: ScoreExplanation;
 }
 
 export type Preferences = Record<AttributeKey, number>;

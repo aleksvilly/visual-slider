@@ -1,8 +1,10 @@
 import type {
   AttributeDefinition,
   CatalogItem,
+  ExplainedRankedItem,
   Preferences,
   RankedItem,
+  ScoreExplanation,
 } from './types';
 
 const clamp = (value: number) => Math.min(100, Math.max(0, value));
@@ -18,26 +20,84 @@ export function scoreItem(
   preferences: Preferences,
   definitions: AttributeDefinition[],
 ): number {
+  return explainItemScore(item, preferences, definitions).score;
+}
+
+/** Returns the same score as scoreItem plus the components used by Ranking Lab. */
+export function explainItemScore(
+  item: CatalogItem,
+  preferences: Preferences,
+  definitions: AttributeDefinition[],
+): ScoreExplanation {
   let weightedDistance = 0;
   let totalWeight = 0;
 
-  for (const definition of definitions) {
+  const components = definitions.map((definition) => {
     const itemValue = item.attributes[definition.key];
     const preference = preferences[definition.key];
+    const weight = definition.weight ?? 1;
 
     if (typeof itemValue !== 'number' || typeof preference !== 'number') {
-      continue;
+      return {
+        key: definition.key,
+        label: definition.label,
+        preference: clamp(preference ?? definition.defaultValue),
+        weight,
+        missing: true,
+      };
     }
 
-    const weight = definition.weight ?? 1;
-    weightedDistance += Math.abs(clamp(itemValue) - clamp(preference)) * weight;
+    const distance = Math.abs(clamp(itemValue) - clamp(preference));
+    const componentWeightedDistance = distance * weight;
+    weightedDistance += componentWeightedDistance;
     totalWeight += weight;
+
+    return {
+      key: definition.key,
+      label: definition.label,
+      preference: clamp(preference),
+      itemValue: clamp(itemValue),
+      weight,
+      distance,
+      weightedDistance: componentWeightedDistance,
+      missing: false,
+    };
+  });
+
+  if (totalWeight === 0) {
+    return {
+      score: 0.5,
+      totalWeight,
+      components,
+      missingAttributes: components
+        .filter((component) => component.missing)
+        .map((component) => component.key),
+    };
   }
 
-  if (totalWeight === 0) return 0.5;
-
   const averageDistance = weightedDistance / totalWeight;
-  return Math.max(0, 1 - averageDistance / 100);
+  return {
+    score: Math.max(0, 1 - averageDistance / 100),
+    averageDistance,
+    totalWeight,
+    components,
+    missingAttributes: components
+      .filter((component) => component.missing)
+      .map((component) => component.key),
+  };
+}
+
+export function rankItemsWithExplanation(
+  items: CatalogItem[],
+  preferences: Preferences,
+  definitions: AttributeDefinition[],
+): ExplainedRankedItem[] {
+  return items
+    .map((item) => {
+      const explanation = explainItemScore(item, preferences, definitions);
+      return { item, score: explanation.score, explanation };
+    })
+    .sort((a, b) => b.score - a.score);
 }
 
 export function rankItems(

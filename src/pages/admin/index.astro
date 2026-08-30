@@ -1,0 +1,70 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { adminSummary } from '../../lib/platform/adminReadModel';
+
+const base = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+
+const cards = [
+  ['Categories', adminSummary.categories, 'categories'],
+  ['Attributes', adminSummary.attributes, 'attributes'],
+  ['Catalog items', adminSummary.items, 'items'],
+  ['Sources', adminSummary.sources, 'sources'],
+  ['Open errors', adminSummary.openErrors, 'errors'],
+  ['Review queue', adminSummary.reviewQueue, 'duplicates'],
+] as const;
+---
+
+<AdminLayout title="Dashboard" activeSection="dashboard">
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">Phase 1 / platform foundation</p>
+      <h1>Dashboard</h1>
+    </div>
+    <span class="admin-mode">Protected by Supabase Auth</span>
+  </header>
+
+  <section class="admin-callout">
+    <strong>Platform seam active</strong>
+    <p>
+      The public explorer selects the server-side Postgres repository when Supabase is configured and otherwise uses the checked-in seed fallback. Admin routes require a validated user with the administrator app-metadata role.
+    </p>
+  </section>
+
+  <section class="admin-stat-grid" aria-label="Catalog totals">
+    {cards.map(([label, value, path]) => (
+      <a href={`${base}admin/${path}/`}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>Inspect →</small>
+      </a>
+    ))}
+  </section>
+
+  <section class="admin-panel-grid">
+    <article class="admin-panel">
+      <p class="eyebrow">Fallback catalog</p>
+      <h2>Pants prototype seed</h2>
+      <dl class="admin-definition-list">
+        <div><dt>Enabled</dt><dd>Yes</dd></div>
+        <div><dt>Adapter</dt><dd>Checked-in seed</dd></div>
+        <div><dt>Last run</dt><dd>Not ingested</dd></div>
+        <div><dt>Status</dt><dd>Ready if unconfigured</dd></div>
+      </dl>
+    </article>
+    <article class="admin-panel">
+      <p class="eyebrow">Operational state</p>
+      <h2>No jobs or failures</h2>
+      <p>
+        Ingestion and AI tables are defined, but no worker is connected in this first slice. Empty states are explicit so static demo data is never mistaken for completed ingestion.
+      </p>
+    </article>
+    <article class="admin-panel admin-panel-featured">
+      <p class="eyebrow">Ranking diagnostics</p>
+      <h2>Explain the order</h2>
+      <p>Use the same scoring implementation as the Pants explorer and inspect every weighted distance.</p>
+      <a class="admin-inline-link" href={`${base}admin/ranking/`}>Open Ranking Lab →</a>
+    </article>
+  </section>
+</AdminLayout>

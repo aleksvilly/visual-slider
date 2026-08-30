@@ -1,0 +1,69 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  activeSection: string;
+  description?: string;
+}
+
+const { title, activeSection, description = 'Visual Slider platform administration' } = Astro.props;
+const base = '/';
+const adminEmail = Astro.locals.adminUser?.email;
+
+const sections = [
+  ['dashboard', 'Dashboard', 'admin/'],
+  ['categories', 'Categories', 'admin/categories/'],
+  ['attributes', 'Attributes', 'admin/attributes/'],
+  ['items', 'Items', 'admin/items/'],
+  ['sources', 'Sources', 'admin/sources/'],
+  ['ingestion', 'Ingestion runs', 'admin/ingestion/'],
+  ['analysis', 'AI analysis', 'admin/analysis/'],
+  ['errors', 'Errors', 'admin/errors/'],
+  ['duplicates', 'Duplicates / review', 'admin/duplicates/'],
+  ['ranking', 'Ranking Lab', 'admin/ranking/'],
+] as const;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} — Visual Slider Admin</title>
+  </head>
+  <body class="admin-body">
+    <header class="admin-mobile-head">
+      <a class="brand" href={base}>VISUAL / SLIDER</a>
+      <span>ADMIN</span>
+    </header>
+    <div class="admin-shell">
+      <aside class="admin-sidebar">
+        <div>
+          <a class="brand" href={base}>VISUAL / SLIDER</a>
+          <p class="admin-label">Platform admin</p>
+        </div>
+        <nav aria-label="Admin sections">
+          {sections.map(([key, label, href]) => (
+            <a class:list={{ active: activeSection === key }} href={`${base}${href}`}>
+              {label}
+            </a>
+          ))}
+        </nav>
+        <div class="admin-sidebar-foot">
+          <span class="status-dot"></span>
+          Authenticated admin
+          <small>{adminEmail ?? 'Supabase Auth'}</small>
+          <form action="/admin/logout" method="post">
+            <button type="submit">Sign out</button>
+          </form>
+        </div>
+      </aside>
+      <main class="admin-main">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

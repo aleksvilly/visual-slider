@@ -1,13 +1,19 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import VisualExplorer from '../components/VisualExplorer.vue';
-import { pantsCategory } from '../data/categories';
-import { pantsItems } from '../data/pants';
+import { getServerCatalogRepository } from '../lib/catalog/serverRepository.server';
+
+const repository = getServerCatalogRepository();
+const catalog = await repository.getExplorerCatalog('pants');
+
+if (!catalog) {
+  throw new Error('The published Pants catalog is not configured.');
+}
 ---
 
 <BaseLayout
   title="Pants — Visual Slider"
   description="Explore existing pants references using semantic sliders instead of search vocabulary."
 >
-  <VisualExplorer client:load category={pantsCategory} items={pantsItems} />
+  <VisualExplorer client:load category={catalog.category} items={catalog.items} />
 </BaseLayout>

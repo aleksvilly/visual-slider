@@ -1,17 +1,30 @@
 # Architecture
 
-## Current prototype
+## Current implementation
 
 ```text
-Astro page
-  └─ Vue VisualExplorer island
-      ├─ category definition
-      ├─ static catalog items
-      ├─ ranking.ts
-      └─ LocalStorage moodboard
+Astro server build on Vercel
+  ├─ public /pants explorer
+  │   └─ server repository selector
+  │       ├─ SupabaseCatalogRepository when configured
+  │       └─ checked-in seed fallback when variables are absent
+  ├─ middleware-protected /admin
+  │   ├─ Supabase Auth cookie session
+  │   ├─ app_metadata.role = admin
+  │   └─ read-only operational views + Ranking Lab
+  ├─ Vue VisualExplorer + Ranking Lab islands
+  │   └─ shared ranking.ts + score explanations
+  └─ LocalStorage moodboard
+
+versioned Postgres/Supabase migration
+  ├─ canonical catalog/category/source tables
+  ├─ ingestion + analysis run history
+  ├─ errors + duplicate review queue
+  ├─ explicit grants + RLS on every public table
+  └─ published catalog reads / authenticated admin management
 ```
 
-This remains useful as a lightweight reference implementation, but it is no longer the full target architecture.
+This is the second Phase 1 slice. Runtime catalog reads, Vercel server output, and the admin authentication boundary are connected. Admin views remain read-only until authenticated write forms and server actions are implemented.
 
 ## Target platform architecture
 
@@ -71,14 +84,31 @@ sources / APIs / feeds / public pages / creator uploads
 
 The working implementation direction is:
 
-- Astro + Vue for the application UI;
-- Vercel for the full web/API deployment once server routes are introduced;
+- Astro 7 + Vue for the application UI;
+- Vercel server output through the official adapter;
 - Postgres as the source of truth;
 - Supabase as the preferred initial managed Postgres/Auth/Storage provider unless a concrete implementation reason favors another provider;
 - GitHub remains the source repository and deployment trigger;
-- the existing GitHub Pages build can remain as a temporary static demo while useful.
+- GitHub Actions validates the migration, types, and production build; Vercel is now the application deployment target.
 
 Core domain and ranking code should not depend directly on one infrastructure vendor.
+
+### Repository transition
+
+The explorer consumes a small `CatalogRepository` contract that returns a category definition and its canonical items. Implementations are selected on the server/build side:
+
+```text
+VisualExplorer
+      ↑ stable explorer contract
+Astro category route
+      ↑ CatalogRepository
+      ├─ seed repository (missing-variable fallback)
+      └─ Supabase/Postgres repository (configured runtime)
+```
+
+Do not import Supabase or another provider into `VisualExplorer` or `ranking.ts`. Provider-specific query and row-mapping code belongs in the Postgres repository adapter.
+
+The repository uses the low-privilege publishable key on the server and therefore remains subject to public RLS. Configuration is accepted only when `SUPABASE_PROJECT_REF` and `SUPABASE_URL` both identify `yzayxussrpreiyknlnhi`. Database errors do not silently fall back to seed data; fallback is only for intentionally absent environment variables.
 
 ## Core domain model
 
@@ -363,7 +393,11 @@ Suggested areas:
 /admin/ranking
 ```
 
-Admin authorization should be introduced before exposing write operations on a public deployment. Authentication details can remain minimal at first; do not build a complex multi-tenant permission system prematurely.
+Admin routes are rendered on demand and guarded by Astro middleware. Supabase SSR stores the session in cookies, and every admin response is marked private/no-store. The middleware validates the user server-side and requires `user.app_metadata.role === 'admin'`; `user_metadata` is never trusted for authorization.
+
+The same immutable app-metadata claim is checked by Postgres RLS. Anonymous and ordinary authenticated users can select only published catalog rows. The admin claim can manage platform tables, although the current UI remains read-only until explicit write actions are added.
+
+`SUPABASE_SECRET_KEY` is not used for browser or user-session access. It is consumed only by explicit maintenance scripts such as the Pants seed import. Authenticated admin application writes should use the user's cookie-bound client and RLS wherever practical.
 
 ## Background work
 

@@ -1,0 +1,51 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { adminSections } from '../../lib/platform/adminReadModel';
+
+const section = adminSections.find((candidate) => candidate.slug === Astro.params.section);
+if (!section) return Astro.redirect('/admin/', 302);
+---
+
+<AdminLayout title={section.title} activeSection={section.slug} description={section.description}>
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">{section.eyebrow}</p>
+      <h1>{section.title}</h1>
+      <p>{section.description}</p>
+    </div>
+    <span class="admin-mode">Read only</span>
+  </header>
+
+  <section class="admin-table-panel">
+    <div class="admin-table-meta">
+      <strong>{section.rows.length} {section.rows.length === 1 ? 'record' : 'records'}</strong>
+      <span>Seed repository snapshot</span>
+    </div>
+    {section.rows.length > 0 ? (
+      <div class="admin-table-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              {section.columns.map((column) => <th scope="col">{column.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {section.rows.map((row) => (
+              <tr>
+                {section.columns.map((column) => (
+                  <td>{String(row[column.key] ?? '—')}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <div class="admin-empty-state">
+        <span>0</span>
+        <h2>Nothing recorded</h2>
+        <p>{section.emptyMessage}</p>
+      </div>
+    )}
+  </section>
+</AdminLayout>
