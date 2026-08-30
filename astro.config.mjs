@@ -1,8 +1,10 @@
 import { defineConfig } from 'astro/config';
 import vue from '@astrojs/vue';
 
+const isGitHubPages = process.env.GITHUB_PAGES === 'true';
+
 export default defineConfig({
-  site: 'https://aleksvilly.github.io',
-  base: '/visual-slider/',
+  site: isGitHubPages ? 'https://aleksvilly.github.io' : undefined,
+  base: isGitHubPages ? '/visual-slider/' : '/',
   integrations: [vue()],
 });
