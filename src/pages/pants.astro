@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import VisualExplorer from '../components/VisualExplorer.vue';
+import { pantsCategory } from '../data/categories';
+import { pantsItems } from '../data/pants';
+---
+
+<BaseLayout
+  title="Pants — Visual Slider"
+  description="Explore existing pants references using semantic sliders instead of search vocabulary."
+>
+  <VisualExplorer client:load category={pantsCategory} items={pantsItems} />
+</BaseLayout>
