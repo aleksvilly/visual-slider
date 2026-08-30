@@ -109,7 +109,11 @@ button { color: inherit; }
 .control-panel {
   position: sticky;
   top: 57px;
-  min-height: calc(100vh - 57px);
+  height: calc(100vh - 57px);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 30px 24px;
   border-right: 1px solid #bdbbb4;
   background: #f3f1eb;
@@ -187,7 +191,16 @@ button { color: inherit; }
   .principle-grid h2 { margin-top: 45px; }
   .category-preview { grid-template-columns: 1fr; padding: 45px 20px; }
   .explorer-shell { display: block; }
-  .control-panel { position: relative; top: 0; min-height: auto; border-right: 0; border-bottom: 1px solid #bdbbb4; }
+  .control-panel {
+    position: relative;
+    top: 0;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    scrollbar-gutter: auto;
+    border-right: 0;
+    border-bottom: 1px solid #bdbbb4;
+  }
   .results-head { grid-template-columns: 1fr; padding: 24px 18px; }
   .result-grid { grid-template-columns: 1fr; }
   .result-card { border-right: 0; }
