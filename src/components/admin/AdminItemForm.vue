@@ -28,7 +28,6 @@ const props = withDefaults(
 const selectedCategoryId = ref(
   props.initial.categoryId ?? props.categories.find((category) => category.status === 'published')?.id ?? props.categories[0]?.id ?? '',
 );
-const submitting = ref(false);
 const selectedCategory = computed(() =>
   props.categories.find((category) => category.id === selectedCategoryId.value),
 );
@@ -47,7 +46,7 @@ function initialAttributeValue(attributeId: string, defaultValue: number) {
     <h2>{{ errorMessage ? 'Form unavailable' : 'No categories available' }}</h2>
     <p>{{ errorMessage || 'Create a category and its slider definitions before importing an item.' }}</p>
   </div>
-  <form v-else method="post" class="admin-item-form" :aria-busy="submitting" @submit="submitting = true">
+  <form v-else method="post" class="admin-item-form">
     <p v-if="errorMessage" class="admin-form-message admin-form-error" role="alert">
       {{ errorMessage }}
     </p>
@@ -168,8 +167,8 @@ function initialAttributeValue(attributeId: string, defaultValue: number) {
 
     <div class="admin-form-actions">
       <a href="/admin/items/">Cancel</a>
-      <button type="submit" name="intent" value="save" :disabled="submitting">
-        {{ submitting ? 'Saving…' : mode === 'create' ? 'Import item' : 'Save changes' }}
+      <button type="submit" name="intent" value="save">
+        {{ mode === 'create' ? 'Import item' : 'Save changes' }}
       </button>
     </div>
   </form>
