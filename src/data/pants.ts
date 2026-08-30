@@ -52,7 +52,6 @@ export const pantsItems: CatalogItem[] = [
     title: 'Business Block Study',
     creator: 'Visual Slider demo',
     sourceSite: 'demo',
-    sourceUrl: 'https://github.com/aleksvilly/visual-slider',
     imageUrl: 'https://picsum.photos/seed/business-block/900/1100',
     note: 'Synthetic metadata placeholder used to test ranking behavior.',
     attributes: {
@@ -70,7 +69,6 @@ export const pantsItems: CatalogItem[] = [
     title: 'Soft Tube Study',
     creator: 'Visual Slider demo',
     sourceSite: 'demo',
-    sourceUrl: 'https://github.com/aleksvilly/visual-slider',
     imageUrl: 'https://picsum.photos/seed/soft-tube/900/1100',
     attributes: {
       square: 16,
@@ -87,7 +85,6 @@ export const pantsItems: CatalogItem[] = [
     title: 'Classic Tailored Study',
     creator: 'Visual Slider demo',
     sourceSite: 'demo',
-    sourceUrl: 'https://github.com/aleksvilly/visual-slider',
     imageUrl: 'https://picsum.photos/seed/classic-tailored/900/1100',
     attributes: {
       square: 18,
@@ -104,7 +101,6 @@ export const pantsItems: CatalogItem[] = [
     title: 'Balloon Volume Study',
     creator: 'Visual Slider demo',
     sourceSite: 'demo',
-    sourceUrl: 'https://github.com/aleksvilly/visual-slider',
     imageUrl: 'https://picsum.photos/seed/balloon-volume/900/1100',
     attributes: {
       square: 20,
@@ -121,7 +117,6 @@ export const pantsItems: CatalogItem[] = [
     title: 'Street Block Study',
     creator: 'Visual Slider demo',
     sourceSite: 'demo',
-    sourceUrl: 'https://github.com/aleksvilly/visual-slider',
     imageUrl: 'https://picsum.photos/seed/street-block/900/1100',
     attributes: {
       square: 82,
@@ -138,7 +133,6 @@ export const pantsItems: CatalogItem[] = [
     title: 'Soft Minimal Study',
     creator: 'Visual Slider demo',
     sourceSite: 'demo',
-    sourceUrl: 'https://github.com/aleksvilly/visual-slider',
     imageUrl: 'https://picsum.photos/seed/soft-minimal/900/1100',
     attributes: {
       square: 28,
