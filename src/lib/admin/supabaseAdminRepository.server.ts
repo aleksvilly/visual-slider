@@ -7,6 +7,7 @@ import {
   ANALYSIS_SCHEMA_VERSION,
 } from '../analysis/openai.server';
 import type { AnalysisWorkflowFailure, AnalysisWorkflowSuccess } from '../analysis/types';
+import { providerAttemptsFromRaw } from '../analysis/providers.server';
 import type { Database, Json } from '../supabase/database.types';
 import { createSupabaseAuthClient } from '../supabase/serverClient.server';
 import type {
@@ -264,7 +265,7 @@ export class SupabaseAdminRepository {
     }));
   }
 
-  async createAnalysisRun(categoryId: string, sourceUrl: string, model: string) {
+  async createAnalysisRun(categoryId: string, sourceUrl: string, provider: string, model: string) {
     const attemptResult = await this.client
       .from('analysis_runs')
       .select('attempt')
@@ -280,7 +281,7 @@ export class SupabaseAdminRepository {
         item_id: null,
         category_id: categoryId,
         source_url: sourceUrl,
-        provider: 'openai',
+        provider,
         model,
         schema_version: ANALYSIS_SCHEMA_VERSION,
         prompt_version: ANALYSIS_PROMPT_VERSION,
@@ -302,13 +303,15 @@ export class SupabaseAdminRepository {
       .from('analysis_runs')
       .update({
         status: 'succeeded',
+        provider: result.analysis.provider,
         model: result.analysis.model,
         finished_at: finishedAt,
         runtime_ms: result.runtimeMs,
         structured_result: result.analysis.structured as unknown as Json,
         raw_result: {
           metadata: result.metadata,
-          openai: result.analysis.raw,
+          provider_attempts: result.analysis.attempts,
+          provider_result: result.analysis.raw,
         } as unknown as Json,
         usage_metadata: result.analysis.usage,
         error_message: null,
@@ -318,10 +321,15 @@ export class SupabaseAdminRepository {
   }
 
   async failAnalysisRun(runId: string, failure: AnalysisWorkflowFailure) {
+    const lastAttempt = failure.providerAttempts.at(-1);
     const result = await this.client
       .from('analysis_runs')
       .update({
         status: 'failed',
+        ...(lastAttempt ? {
+          provider: lastAttempt.provider,
+          model: lastAttempt.actualModel ?? lastAttempt.requestedModel,
+        } : {}),
         finished_at: new Date().toISOString(),
         runtime_ms: failure.runtimeMs,
         raw_result: {
@@ -375,6 +383,7 @@ export class SupabaseAdminRepository {
         runtimeMs: run.runtime_ms,
         structuredResult: run.structured_result as unknown as AdminAnalysisRun['structuredResult'],
         rawResult: run.raw_result,
+        providerAttempts: providerAttemptsFromRaw(run.raw_result),
         usageMetadata: run.usage_metadata,
         errorMessage: run.error_message,
         createdAt: run.created_at,

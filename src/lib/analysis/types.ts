@@ -31,18 +31,49 @@ export interface StructuredSemanticAnalysis {
   attributes: SemanticAttributeAnalysis[];
 }
 
-export interface OpenAIAnalysisResult {
+export type AnalysisProviderErrorKind =
+  | 'rate_limit'
+  | 'timeout'
+  | 'server_error'
+  | 'provider_unavailable'
+  | 'invalid_output'
+  | 'authentication'
+  | 'request_rejected';
+
+export interface AnalysisProviderAttempt {
+  attempt: number;
+  provider: string;
+  requestedModel: string;
+  actualModel: string | null;
+  status: 'succeeded' | 'failed';
+  runtimeMs: number;
+  usage: Json;
+  error: string | null;
+  errorKind: AnalysisProviderErrorKind | null;
+}
+
+export interface AnalysisProviderResult {
+  provider: string;
+  requestedModel: string;
+  actualModel: string;
+  /** Compatibility alias for callers that previously consumed the OpenAI model field. */
   model: string;
   structured: StructuredSemanticAnalysis;
   usage: Json;
   raw: Json;
 }
 
-export type AnalysisFailureStage = 'metadata_fetch' | 'openai' | 'persist';
+export interface AnalysisResult extends AnalysisProviderResult {
+  attempts: AnalysisProviderAttempt[];
+}
+
+export type OpenAIAnalysisResult = AnalysisProviderResult;
+
+export type AnalysisFailureStage = 'metadata_fetch' | 'analysis' | 'persist';
 
 export interface AnalysisWorkflowSuccess {
   metadata: ExtractedPageMetadata;
-  analysis: OpenAIAnalysisResult;
+  analysis: AnalysisResult;
   runtimeMs: number;
 }
 
@@ -51,4 +82,5 @@ export interface AnalysisWorkflowFailure {
   message: string;
   runtimeMs: number;
   raw: Json;
+  providerAttempts: AnalysisProviderAttempt[];
 }

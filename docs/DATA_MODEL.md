@@ -126,7 +126,9 @@ Create and edit forms store numeric price/currency when supplied and keep public
 
 ## URL-assisted analysis and review
 
-Each Analyze URL submission creates an `analysis_runs` row before network access. Attempts for the same category/source are incremented. A successful row stores provider/model, schema and prompt versions, normalized structured attributes, bounded extraction/OpenAI diagnostics, token usage when returned, runtime, and completion state. A failed row stores its stage (`metadata_fetch`, `openai`, or `persist`) and error without creating an item.
+Each Analyze URL submission creates an `analysis_runs` row before network access. Runs for the same category/source increment the existing `attempt` number. Within a run, ordered provider attempts are stored in `raw_result.provider_attempts`; each entry includes provider, requested/actual model, status, runtime, usage, classified error, and error kind. The existing top-level provider/model columns identify the successful provider or the final failed attempt. A failed row stores its stage (`metadata_fetch`, `analysis`, or `persist`) without creating an item.
+
+No third migration is required for provider fallback. Attempt details are bounded diagnostic JSON tied to their parent analysis run, while fields used for list filtering remain in existing indexed columns.
 
 Successful analysis is still not a catalog item. The review page maps category attribute keys back to their definition IDs and reuses the generic item form. Saving invokes the existing observable Manual Import write path, then links `analysis_runs.item_id` and records reviewed attribute provenance through `item_attribute_values.analysis_run_id`. The administrator explicitly chooses `draft`, `review`, or `published`; the default is `review`.
 

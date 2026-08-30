@@ -130,7 +130,9 @@ Potential adapter families later:
 
 - [x] add a synchronous, single-item Analyze URL action for authenticated administrators;
 - [x] fetch bounded public HTML metadata with redirect-aware SSRF protection;
-- [x] add server-side OpenAI Responses API integration with no browser key;
+- [x] add provider-neutral server-side analysis adapters with no browser keys;
+- [x] add OpenRouter `openrouter/free` as primary and preserve OpenAI Responses as fallback;
+- [x] restrict fallback to retryable provider/model failures and retain every provider attempt;
 - [x] generate strict structured output from the selected category's enabled attributes;
 - [x] use extracted text metadata plus a public image URL when available;
 - [x] version provider/model/schema/prompt and store structured/raw diagnostics;
@@ -139,6 +141,7 @@ Potential adapter families later:
 - [x] expose analysis diagnostics and retry links in admin;
 - [ ] move analysis to async job state/worker execution when volume requires it;
 - [ ] allow admin re-analysis of an existing item or a batch;
+- [ ] add direct Gemini, Qwen, and DeepSeek provider adapters when needed;
 - [ ] track approximate cost metadata when pricing policy is defined.
 
 AI analysis should happen at ingestion/re-analysis time, not on every slider movement.

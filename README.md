@@ -27,7 +27,7 @@ The domain model is generic so later categories can include bags, furniture, pos
 - Vue 3 islands
 - TypeScript
 - Supabase Postgres 17 and Supabase Auth
-- OpenAI Responses API for server-side semantic analysis
+- Provider-neutral server-side semantic analysis through OpenRouter and OpenAI
 - Provider-neutral server repository with a static seed fallback
 - Vercel server adapter
 - Protected Supabase-backed admin writes and Ranking Lab
@@ -64,11 +64,13 @@ Runtime variables:
 SUPABASE_PROJECT_REF
 SUPABASE_URL
 SUPABASE_PUBLISHABLE_KEY
+OPENROUTER_API_KEY
+OPENROUTER_ANALYSIS_MODEL
 OPENAI_API_KEY
 OPENAI_ANALYSIS_MODEL
 ```
 
-`OPENAI_API_KEY` is required for **Analyze URL**. `OPENAI_ANALYSIS_MODEL` is optional and defaults to `gpt-5.6`. Both are server-only. `SUPABASE_SECRET_KEY` is privileged and optional for the current Vercel runtime; it is required only by the explicit Pants import command. Never prefix any secret with `PUBLIC_`, commit it, or expose it in browser code.
+Analyze URL attempts OpenRouter first and OpenAI second. `OPENROUTER_ANALYSIS_MODEL` defaults to `openrouter/free`; `OPENAI_ANALYSIS_MODEL` defaults to `gpt-5.6`. Provider keys and model configuration are server-only. `SUPABASE_SECRET_KEY` is privileged and optional for the current Vercel runtime; it is required only by the explicit Pants import command. Never prefix any secret with `PUBLIC_`, commit it, or expose it in browser code.
 
 ### Migration
 
@@ -130,7 +132,7 @@ The user must sign in again after a role change so a fresh JWT contains the clai
 - `/admin` — protected database-backed operational dashboard
 - `/admin/items` — real catalog list with manual import, edit, archive, and delete workflows
 - `/admin/items/new` — generic category-driven Manual Import
-- `/admin/analyze` — SSRF-protected public-page metadata fetch plus synchronous OpenAI analysis
+- `/admin/analyze` — SSRF-protected public-page metadata fetch plus synchronous provider fallback
 - `/admin/sources`, `/admin/ingestion`, `/admin/errors` — real source and import observability
 - `/admin/categories`, `/admin/attributes` — current category-definition inspection
 - `/admin/analysis` — versioned AI diagnostics, review, and failure retry
@@ -178,6 +180,6 @@ Slider values are preferences, not strict constraints. The engine should nearly 
 
 Phase 1 includes the deployed Postgres 17 foundation, a server-side Supabase repository, seed fallback, Vercel server output, protected admin routes, and authenticated catalog writes. Manual Import is a small generic adapter: it upserts a shared manual source, records an ingestion run, creates or updates one canonical item, and writes the selected category's semantic values. Failed validation or persistence is retained in ingestion diagnostics.
 
-The first Phase 2 AI slice adds one controlled URL-assisted path. An authenticated admin selects any configured category and submits one public URL. The server validates and fetches bounded public HTML metadata, calls the OpenAI Responses API with that category's enabled attributes, records the versioned result, and presents the existing generic item form for correction. No item is created or published until the admin explicitly saves the review.
+The first Phase 2 AI slice adds one controlled URL-assisted path. An authenticated admin selects any configured category and submits one public URL. The server validates and fetches bounded public HTML metadata once, then tries category-driven provider adapters in the fixed order OpenRouter → OpenAI. Each attempt records requested/actual model, status, runtime, usage, and error. No item is created or published until the admin explicitly saves the review.
 
-All admin forms post to Astro SSR and use the signed-in user's Supabase cookie session, so normal RLS and the `app_metadata.role = admin` policy authorize every write. Supabase privileged credentials and `OPENAI_API_KEY` are never used in browser code. Bulk crawling, background queues, embeddings, and automatic publication remain unimplemented.
+Fallback is limited to rate/quota errors, timeout, provider 5xx/unavailability, and invalid/incomplete structured output. URL, SSRF, metadata-access, category, authentication, and other request errors do not move to another provider. All admin forms post to Astro SSR and use the signed-in user's Supabase cookie session, so normal RLS and the `app_metadata.role = admin` policy authorize every write. Provider API keys and Supabase privileged credentials are never used in browser code. Bulk crawling, background queues, embeddings, and automatic publication remain unimplemented.

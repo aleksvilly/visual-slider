@@ -95,7 +95,7 @@ test('surfaces an OpenAI API failure', async () => {
   );
 });
 
-test('records the OpenAI stage when analysis fails and creates no item', async () => {
+test('records the analysis stage when a provider fails and creates no item', async () => {
   let failureStage = '';
   let successCalled = false;
   await assert.rejects(
@@ -107,9 +107,9 @@ test('records the OpenAI stage when analysis fails and creates no item', async (
       analyze: async () => { throw new OpenAIAnalysisError('mocked model failure'); },
       now: (() => { let time = 1000; return () => (time += 25); })(),
     }),
-    (error: unknown) => error instanceof AnalysisWorkflowError && error.failure.stage === 'openai',
+    (error: unknown) => error instanceof AnalysisWorkflowError && error.failure.stage === 'analysis',
   );
-  assert.equal(failureStage, 'openai');
+  assert.equal(failureStage, 'analysis');
   assert.equal(successCalled, false);
 });
 
@@ -121,6 +121,7 @@ test('maps a successful analysis into the existing generic review form', () => {
     schemaVersion: 'semantic-attributes-v1', promptVersion: 'url-metadata-vision-v1', attempt: 1,
     startedAt: null, finishedAt: null, runtimeMs: 100, structuredResult: structured,
     rawResult: { metadata: metadata as unknown as Record<string, never> }, usageMetadata: {},
+    providerAttempts: [],
     errorMessage: null, createdAt: new Date(0).toISOString(),
   };
   const initial = analysisReviewInitial(run, category);

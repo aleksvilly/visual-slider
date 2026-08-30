@@ -68,6 +68,11 @@ const linkedItemId = run?.itemId ?? null;
 const runStatus = run?.status ?? '';
 const rawResult = run?.rawResult ?? null;
 const analysisErrorMessage = run?.errorMessage ?? '';
+const providerAttempts = run?.providerAttempts ?? [];
+const attemptTokens = (attempt: (typeof providerAttempts)[number]) => {
+  if (!attempt.usage || typeof attempt.usage !== 'object' || Array.isArray(attempt.usage)) return '—';
+  return String((attempt.usage as Record<string, unknown>).total_tokens ?? '—');
+};
 const failureStage = rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
   ? String((rawResult as Record<string, unknown>).stage ?? 'analysis')
   : 'analysis';
@@ -87,6 +92,28 @@ const failureStage = rawResult && typeof rawResult === 'object' && !Array.isArra
         <div><dt>Total tokens</dt><dd>{String(usage.total_tokens ?? '—')}</dd></div>
         <div><dt>Version</dt><dd>{run?.schemaVersion}<small>{run?.promptVersion}</small></dd></div>
       </section>
+
+      {providerAttempts.length > 0 && (
+        <section class="admin-form-section admin-provider-attempts">
+          <div class="admin-form-section-head"><div><p class="eyebrow">Fallback trace</p><h2>Provider attempts</h2></div><span>{providerAttempts.length} {providerAttempts.length === 1 ? 'attempt' : 'attempts'}</span></div>
+          <div class="admin-provider-attempt-grid">
+            {providerAttempts.map((attempt) => (
+              <article>
+                <header><strong>Attempt {attempt.attempt}</strong><span class={`admin-status admin-status-${attempt.status}`}>{attempt.status}</span></header>
+                <dl>
+                  <div><dt>Provider</dt><dd>{attempt.provider}</dd></div>
+                  <div><dt>Requested</dt><dd>{attempt.requestedModel}</dd></div>
+                  <div><dt>Actual</dt><dd>{attempt.actualModel ?? '—'}</dd></div>
+                  <div><dt>Runtime</dt><dd>{attempt.runtimeMs} ms</dd></div>
+                  <div><dt>Tokens</dt><dd>{attemptTokens(attempt)}</dd></div>
+                  <div><dt>Error kind</dt><dd>{attempt.errorKind ?? '—'}</dd></div>
+                </dl>
+                {attempt.error && <p class="admin-form-message admin-form-error">{attempt.error}</p>}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {analysisErrorMessage && <section class="admin-error-state" role="alert"><p class="eyebrow">{failureStage} failure</p><h2>Analysis failed</h2><p>{analysisErrorMessage}</p><a href={retryUrl}>Retry this URL →</a></section>}
 

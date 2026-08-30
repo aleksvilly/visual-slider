@@ -4,7 +4,7 @@ AI tagging is an **indexing task**, not part of the real-time slider interaction
 
 ## Current single-item workflow
 
-`/admin/analyze` accepts a public URL and category. The server extracts bounded page metadata, then calls the OpenAI Responses API with the category definition, every enabled attribute's low/high labels, extracted text, and an optional public image URL. Strict structured output must contain exactly one normalized `0..100` value, confidence, and reason for each enabled attribute.
+`/admin/analyze` accepts a public URL and category. The server extracts bounded page metadata once, then sends the category definition, every enabled attribute's low/high labels, extracted text, and an optional public image URL through the provider chain. Strict structured output must contain exactly one normalized `0..100` value, confidence, and reason for each enabled attribute.
 
 The run is written before fetching so metadata and model failures are observable. Results retain provider/model, schema/prompt versions, raw diagnostics, token usage, runtime, attempts, and error state. A successful run opens the shared item form and defaults to `review`; it is never published automatically. Administrator corrections are linked back to the analysis run.
 
@@ -12,7 +12,10 @@ Current versions:
 
 - schema: `semantic-attributes-v1`;
 - prompt: `url-metadata-vision-v1`;
-- default model: `gpt-5.6` (overridable with `OPENAI_ANALYSIS_MODEL`).
+- primary: OpenRouter `openrouter/free` (overridable with `OPENROUTER_ANALYSIS_MODEL`);
+- fallback: OpenAI `gpt-5.6` (overridable with `OPENAI_ANALYSIS_MODEL`).
+
+Provider fallback is deliberately narrow: rate/quota, timeout, `5xx`, provider/model unavailability, or invalid/incomplete structured output. Invalid URL/category, SSRF and metadata failures, authentication errors, and other rejected requests do not fall back. Attempt diagnostics live in the existing analysis run JSON, so this slice adds no migration.
 
 ## Desired pipeline
 

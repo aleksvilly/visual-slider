@@ -1,12 +1,15 @@
 import type { AdminCategory } from '../admin/types';
 import type { Json } from '../supabase/database.types';
 import { fetchPageMetadata } from './metadata.server';
-import { analyzePageWithOpenAI } from './openai.server';
+import {
+  analyzePageWithProviders,
+  AnalysisProvidersExhaustedError,
+} from './providers.server';
 import type {
+  AnalysisResult,
   AnalysisWorkflowFailure,
   AnalysisWorkflowSuccess,
   ExtractedPageMetadata,
-  OpenAIAnalysisResult,
 } from './types';
 
 export class AnalysisWorkflowError extends Error {
@@ -30,7 +33,7 @@ export async function runRecordedUrlAnalysis(
     analyze?: (
       metadata: ExtractedPageMetadata,
       category: AdminCategory,
-    ) => Promise<OpenAIAnalysisResult>;
+    ) => Promise<AnalysisResult>;
     now?: () => number;
   } = {},
 ) {
@@ -40,14 +43,15 @@ export async function runRecordedUrlAnalysis(
   let metadata: ExtractedPageMetadata | null = null;
   try {
     metadata = await (dependencies.fetchMetadata ?? fetchPageMetadata)(sourceUrl);
-    stage = 'openai';
-    const analysis = await (dependencies.analyze ?? analyzePageWithOpenAI)(metadata, category);
+    stage = 'analysis';
+    const analysis = await (dependencies.analyze ?? analyzePageWithProviders)(metadata, category);
     const result = { metadata, analysis, runtimeMs: Math.max(0, now() - startedAt) };
     stage = 'persist';
     await store.succeed(result);
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown analysis failure';
+    const providerAttempts = error instanceof AnalysisProvidersExhaustedError ? error.attempts : [];
     const failure: AnalysisWorkflowFailure = {
       stage,
       message,
@@ -55,7 +59,9 @@ export async function runRecordedUrlAnalysis(
       raw: {
         source_url: sourceUrl,
         extraction: metadata?.raw ?? null,
-      } as Json,
+        provider_attempts: providerAttempts,
+      } as unknown as Json,
+      providerAttempts,
     };
     try {
       await store.fail(failure);

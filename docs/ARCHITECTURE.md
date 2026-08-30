@@ -12,7 +12,7 @@ Astro server build on Vercel
   │   ├─ Supabase Auth cookie session
   │   ├─ app_metadata.role = admin
   │   ├─ authenticated item writes + Manual Import
-  │   ├─ public-URL metadata fetch + OpenAI analysis/review
+  │   ├─ public-URL metadata fetch + provider analysis/review
   │   └─ real source/run/error/analysis views + Ranking Lab
   ├─ Vue VisualExplorer + Ranking Lab islands
   │   └─ shared ranking.ts + score explanations
@@ -36,7 +36,7 @@ authenticated admin POST
   → validate public HTTP/HTTPS URL and resolve every DNS answer
   → fetch DNS-pinned, bounded HTML (redirects revalidated)
   → extract canonical/title/image/site/creator/structured price metadata
-  → OpenAI Responses API with dynamic category schema + optional public image URL
+  → provider chain with dynamic category schema + optional public image URL
   → store versioned result, usage, runtime, extraction diagnostics, or failure
   → reuse generic item form for admin correction
   → explicit draft / review / published save through existing item import path
@@ -44,9 +44,13 @@ authenticated admin POST
 
 The fetcher rejects credentials, localhost and private/reserved networks, non-HTML or compressed responses, more than three redirects, responses above 1.5 MB, and requests exceeding eight seconds. It sends no cookies or credentials and does not attempt to evade authentication, CAPTCHAs, paywalls, or anti-bot controls. DNS is pinned to an address that was validated before the connection, and redirect targets are independently validated.
 
-OpenAI uses `POST /v1/responses` server-side with strict JSON Schema output, `store: false`, and an optional low-detail image input. The schema is built from enabled attributes on the selected category; the analysis layer has no Pants-specific vocabulary. The default model is `gpt-5.6`, configurable through `OPENAI_ANALYSIS_MODEL`.
+The provider-neutral contract receives extracted metadata, the selected category, its enabled attributes, and the optional public image URL. OpenRouter uses `POST /api/v1/chat/completions` with `response_format.type = json_schema`, `require_parameters: true`, and `openrouter/free` by default. OpenAI remains fully supported through `POST /v1/responses`, strict `text.format`, `store: false`, and `gpt-5.6` by default.
 
-The shared Vercel server function has a 60-second maximum duration. The metadata fetch has an absolute eight-second limit and the OpenAI request has a 45-second limit, leaving a small margin for authenticated database writes while keeping this first implementation synchronous.
+The fixed chain is OpenRouter → OpenAI. Fallback occurs only for `429`, timeout, provider `5xx`, unavailable provider/model, or malformed/incomplete structured output. Metadata is fetched exactly once before the chain. Invalid URL, SSRF rejection, inaccessible metadata, invalid category, provider authentication, and other rejected requests stop immediately. New adapters implement `AnalysisProvider` and can be registered without changing the metadata workflow; `GeminiProvider`, `QwenProvider`, and `DeepSeekProvider` are intentionally not implemented yet.
+
+Each `analysis_runs` row keeps the successful or final provider/model in its existing columns and an ordered `provider_attempts` array in `raw_result`. That JSON records requested/actual model, status, runtime, tokens, error kind, and error for every provider attempt. This avoids a new table and requires no additional migration.
+
+The shared Vercel server function has a 60-second maximum duration. Metadata has an absolute eight-second limit, OpenRouter 18 seconds, and OpenAI 28 seconds, leaving a small margin for authenticated database writes while keeping this first implementation synchronous.
 
 ## Target platform architecture
 
@@ -308,7 +312,7 @@ Important properties:
 - category-schema driven;
 - not required during interactive slider movement.
 
-OpenAI integration belongs here, not inside the browser ranking loop.
+Provider integrations belong here, not inside the browser ranking loop.
 
 ### Ranking core
 

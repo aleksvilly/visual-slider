@@ -365,6 +365,14 @@ button { color: inherit; }
 .admin-analysis-attributes header span { font-variant-numeric: tabular-nums; font-weight: 800; }
 .admin-analysis-attributes small { display: block; margin-top: 6px; color: #66655f; }
 .admin-analysis-attributes p { margin: 14px 0 0; font-size: 11px; line-height: 1.45; }
+.admin-provider-attempts { margin-top: 16px; }
+.admin-provider-attempt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+.admin-provider-attempt-grid article { padding: 14px; border: 1px solid #d0cec6; background: #f3f1eb; }
+.admin-provider-attempt-grid header, .admin-provider-attempt-grid dl div { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.admin-provider-attempt-grid dl { display: grid; gap: 7px; margin: 14px 0 0; }
+.admin-provider-attempt-grid dt { color: #66655f; }
+.admin-provider-attempt-grid dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
+.admin-provider-attempt-grid .admin-form-message { margin-top: 14px; }
 .admin-analysis-review { margin-top: 28px; }
 .admin-analysis-review > header { margin-bottom: 16px; }
 .admin-analysis-review > header h2 { margin: 0; font-size: 32px; letter-spacing: -.04em; }

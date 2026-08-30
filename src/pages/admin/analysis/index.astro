@@ -34,9 +34,9 @@ const publicHttpUrl = (value: string | null) => {
 };
 ---
 
-<AdminLayout title="AI analysis" activeSection="analysis" description="Inspect versioned URL-assisted OpenAI analysis runs and retry failures.">
+<AdminLayout title="AI analysis" activeSection="analysis" description="Inspect versioned URL-assisted provider attempts and retry failures.">
   <header class="admin-page-head">
-    <div><p class="eyebrow">Versioned offline analysis</p><h1>AI analysis</h1><p>Every attempt retains its model, schema/prompt version, runtime, usage, confidence, structured result, and failure state.</p></div>
+    <div><p class="eyebrow">Versioned offline analysis</p><h1>AI analysis</h1><p>Every run retains its ordered provider attempts, requested and actual models, runtime, usage, confidence, structured result, and failure state.</p></div>
     <a class="admin-primary-action" href="/admin/analyze/">Analyze URL</a>
   </header>
 

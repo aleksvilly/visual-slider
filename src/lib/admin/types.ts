@@ -1,4 +1,5 @@
 import type { Json } from '../supabase/database.types';
+import type { AnalysisProviderAttempt } from '../analysis/types';
 
 export type PublicationStatus = 'draft' | 'review' | 'published' | 'rejected' | 'archived';
 
@@ -126,6 +127,7 @@ export interface AdminAnalysisRun {
   runtimeMs: number | null;
   structuredResult: import('../analysis/types').StructuredSemanticAnalysis | null;
   rawResult: Json | null;
+  providerAttempts: AnalysisProviderAttempt[];
   usageMetadata: Json;
   errorMessage: string | null;
   createdAt: string;

@@ -1,6 +1,6 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { getOpenAIAnalysisModel } from '../../../lib/analysis/config.server';
+import { getDefaultProviderDescriptors } from '../../../lib/analysis/providers.server';
 import { runRecordedUrlAnalysis } from '../../../lib/analysis/workflow.server';
 import { assertSameOrigin } from '../../../lib/admin/itemForm.server';
 import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
@@ -11,6 +11,11 @@ let errorMessage = '';
 let sourceUrl = Astro.url.searchParams.get('sourceUrl') ?? '';
 let categoryId = Astro.url.searchParams.get('category') ?? '';
 let repository: Awaited<ReturnType<typeof createSupabaseAdminRepository>> | null = null;
+const providerDescriptors = getDefaultProviderDescriptors();
+const primaryProvider = providerDescriptors[0]!;
+const providerLabel = providerDescriptors
+  .map((provider) => `${provider.provider} ${provider.requestedModel}`)
+  .join(' → ');
 
 try {
   repository = await createSupabaseAdminRepository(Astro);
@@ -32,7 +37,8 @@ try {
     const runId = await repository.createAnalysisRun(
       category.id,
       sourceUrl,
-      getOpenAIAnalysisModel(),
+      primaryProvider.provider,
+      primaryProvider.requestedModel,
     );
     try {
       await runRecordedUrlAnalysis(sourceUrl, category, {
@@ -58,9 +64,9 @@ try {
     <div>
       <p class="eyebrow">URL-assisted analysis</p>
       <h1>Analyze URL</h1>
-      <p>The server fetches public metadata once, asks OpenAI for dynamic category attributes, and saves a reviewable analysis run. It never publishes automatically.</p>
+      <p>The server fetches public metadata once, tries the configured analysis providers in order, and saves a reviewable run. It never publishes automatically.</p>
     </div>
-    <span class="admin-mode">{getOpenAIAnalysisModel()} · synchronous</span>
+    <span class="admin-mode">{providerLabel} · synchronous</span>
   </header>
 
   <section class="admin-form-section admin-analyze-panel">
