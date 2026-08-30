@@ -28,7 +28,7 @@ score = 1 - weighted_distance / 100
 
 The UI sorts descending by score.
 
-`ranking.ts` also exposes the same calculation as a structured explanation. Ranking Lab uses it to show the preference, item value, absolute distance, category weight, weighted distance, active total weight, and final score. This keeps diagnostics and public ordering from drifting into separate implementations.
+`ranking.ts` also exposes the same calculation as a structured explanation. Ranking Lab uses real published database items and shows the user slider, raw item value, absolute distance, category weight, weighted distance, per-attribute score contribution, active total weight, and final score. Contributions sum to the total semantic score. This keeps diagnostics and public ordering from drifting into separate implementations.
 
 ## Missing attributes
 

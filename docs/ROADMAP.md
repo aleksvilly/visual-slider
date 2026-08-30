@@ -38,11 +38,14 @@ The first incremental foundation slice is implemented:
 - [x] add protected Supabase Auth admin routes with cookie sessions and no-store responses;
 - [x] add Vercel server output and replace the GitHub Pages deploy workflow with server-build verification;
 - [x] document the exact project-bound environment variables and manual Auth setup;
-- [ ] apply the source-of-truth migration to the existing `yzayxussrpreiyknlnhi` project;
-- [ ] run the Pants seed import against that explicitly configured project;
-- [ ] add authenticated server-side category, attribute, item, and source write actions.
+- [x] apply the source-of-truth migration to the existing `yzayxussrpreiyknlnhi` project;
+- [x] run the Pants seed import against that explicitly configured project;
+- [x] add authenticated server-side item create/edit/archive/delete actions;
+- [x] back Items, Sources, Ingestion runs, Errors, Dashboard totals, and Ranking Lab with Supabase;
+- [x] add a generic one-item Manual Import with category-driven attributes and run/error observability;
+- [ ] add authenticated category, attribute, and source configuration write actions.
 
-The migration and repository were not run remotely because this workspace had no explicit Supabase link or environment configuration. The read-only admin deliberately does not imply that external ingestion or AI analysis has run; those remain Phase 2 work.
+Production now serves the seeded Pants catalog from Supabase. The first admin write path uses the authenticated user and existing RLS policies; no privileged runtime key, external ingestion, or AI analysis is implied.
 
 ### Database
 
@@ -110,7 +113,8 @@ source
 - store counts for imported / updated / skipped / duplicate / failed;
 - expose `Run now` from admin;
 - log errors with enough context for debugging;
-- support manual/CSV/JSON import as a low-risk first adapter;
+- [x] support a one-item authenticated Manual Import as the first low-risk adapter;
+- [ ] add CSV/JSON batch import;
 - then add one real external source adapter.
 
 Potential adapter families later:

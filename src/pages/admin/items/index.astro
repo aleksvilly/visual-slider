@@ -1,0 +1,87 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminItemSummary } from '../../../lib/admin/types';
+
+let items: AdminItemSummary[] = [];
+let errorMessage = '';
+try {
+  items = await (await createSupabaseAdminRepository(Astro)).listItems();
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'Catalog items could not be loaded.';
+}
+const deleted = Astro.url.searchParams.get('deleted') === '1';
+const formatDate = (value: string) => new Intl.DateTimeFormat('en', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+}).format(new Date(value));
+---
+
+<AdminLayout
+  title="Items"
+  activeSection="items"
+  description="Create, edit, archive, and remove canonical catalog items through authenticated Supabase writes."
+>
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">Canonical catalog</p>
+      <h1>Items</h1>
+      <p>All item types use the same category-scoped attribute model and source identity fields.</p>
+    </div>
+    <a class="admin-primary-action" href="/admin/items/new/">Manual import</a>
+  </header>
+
+  {deleted && <p class="admin-form-message admin-form-success" role="status">Item deleted.</p>}
+  {errorMessage ? (
+    <section class="admin-error-state" role="alert">
+      <p class="eyebrow">Database error</p>
+      <h2>Items could not be loaded</h2>
+      <p>{errorMessage}</p>
+      <a href="/admin/items/">Try again</a>
+    </section>
+  ) : (
+    <section class="admin-table-panel">
+      <div class="admin-table-meta">
+        <strong>{items.length} {items.length === 1 ? 'item' : 'items'}</strong>
+        <span>Supabase catalog</span>
+      </div>
+      {items.length ? (
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Attributes</th>
+                <th>Updated</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr>
+                  <td><strong>{item.title}</strong><small class="admin-table-subline">{item.creator ?? item.publicId}</small></td>
+                  <td>{item.categoryName}</td>
+                  <td>{item.sourceSite}</td>
+                  <td><span class={`admin-status admin-status-${item.publicationStatus}`}>{item.publicationStatus}</span></td>
+                  <td>{item.attributeCount}/{item.attributeTotal}</td>
+                  <td>{formatDate(item.updatedAt)}</td>
+                  <td><a class="admin-row-action" href={`/admin/items/${item.id}/`}>Edit</a></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div class="admin-empty-state">
+          <span>0</span>
+          <h2>No catalog items</h2>
+          <p>Use Manual import to create the first item and observable ingestion run.</p>
+          <a class="admin-inline-link" href="/admin/items/new/">Import an item →</a>
+        </div>
+      )}
+    </section>
+  )}
+</AdminLayout>

@@ -46,6 +46,7 @@ export interface AttributeScoreComponent {
   weight: number;
   distance?: number;
   weightedDistance?: number;
+  scoreContribution?: number;
   missing: boolean;
 }
 

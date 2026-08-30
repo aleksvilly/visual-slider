@@ -1,0 +1,38 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminIngestionError } from '../../../lib/admin/types';
+
+let errors: AdminIngestionError[] = [];
+let errorMessage = '';
+try {
+  errors = await (await createSupabaseAdminRepository(Astro)).listIngestionErrors();
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'Ingestion errors could not be loaded.';
+}
+const formatDate = (value: string) => new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+---
+
+<AdminLayout title="Errors" activeSection="errors" description="Inspect detailed failures recorded by ingestion workflows.">
+  <header class="admin-page-head">
+    <div><p class="eyebrow">Operational diagnostics</p><h1>Errors</h1><p>Failed manual persistence steps retain their run, stage, code, source identity, and message.</p></div>
+    <span class="admin-mode">Supabase errors</span>
+  </header>
+  {errorMessage ? (
+    <section class="admin-error-state" role="alert"><p class="eyebrow">Database error</p><h2>Errors could not be loaded</h2><p>{errorMessage}</p><a href="/admin/errors/">Try again</a></section>
+  ) : (
+    <section class="admin-table-panel">
+      <div class="admin-table-meta"><strong>{errors.length} {errors.length === 1 ? 'error' : 'errors'}</strong><span>Newest first</span></div>
+      {errors.length ? (
+        <div class="admin-table-scroll"><table class="admin-table">
+          <thead><tr><th>Time</th><th>Stage</th><th>Code</th><th>Source item</th><th>Message</th><th>Run</th></tr></thead>
+          <tbody>{errors.map((error) => (
+            <tr><td>{formatDate(error.createdAt)}</td><td>{error.stage}</td><td>{error.code ?? '—'}</td><td>{error.sourceExternalId ?? '—'}</td><td>{error.message}</td><td><small>{error.runId}</small></td></tr>
+          ))}</tbody>
+        </table></div>
+      ) : (
+        <div class="admin-empty-state"><span>0</span><h2>No recorded errors</h2><p>Successful imports do not create error rows.</p></div>
+      )}
+    </section>
+  )}
+</AdminLayout>

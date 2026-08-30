@@ -2,7 +2,7 @@
 
 ## Phase 1 persistence
 
-The initial Postgres schema is versioned in `supabase/migrations/202608300001_phase_1_foundation.sql`. This is the only migration to apply to the fresh `yzayxussrpreiyknlnhi` Supabase project. It has been executed locally against PostgreSQL 17.5; it has not been remotely applied.
+The initial Postgres schema is versioned in `supabase/migrations/202608300001_phase_1_foundation.sql`. It is deployed to the connected `yzayxussrpreiyknlnhi` project and remains the schema source of truth. It is also executed locally against PostgreSQL 17.5 for policy and write-workflow validation. This slice requires no additional migration.
 
 Implemented relations:
 
@@ -104,6 +104,18 @@ Future additions may include:
 The TypeScript `CatalogItem` remains the stable explorer read model, not a one-to-one database row. A repository adapter is responsible for joining item attributes and mapping canonical database fields into this contract.
 
 The current Pants seed script upserts category, attributes, source, items, and values by stable identities and records an ingestion run. It can be safely rerun after the source-of-truth migration is applied.
+
+## Authenticated manual import
+
+Manual Import uses the existing generic relations rather than Pants-specific columns:
+
+- one shared `sources.slug = manual-admin` adapter record;
+- one `ingestion_runs` row per submission;
+- one canonical `items` row created or updated by normalized source URL;
+- one `item_attribute_values` row per enabled category definition;
+- a failed run plus `ingestion_errors` detail for validation/persistence failures.
+
+Create and edit forms store numeric price/currency when supplied and keep publication state separate from semantic values. Archive changes `publication_status`; permanent delete relies on existing foreign-key cascades for item values. All operations use the authenticated user and existing RLS policies, not a service-role client.
 
 ## Important rule
 

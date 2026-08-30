@@ -1,12 +1,23 @@
 ---
 import RankingLab from '../../components/admin/RankingLab.vue';
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getServerCatalogRepository } from '../../lib/catalog/serverRepository.server';
+import { createSupabaseAdminRepository } from '../../lib/admin/supabaseAdminRepository.server';
+import type { AdminCategory } from '../../lib/admin/types';
+import type { ExplorerCatalog } from '../../lib/catalog/repository';
 
-const catalog = await getServerCatalogRepository().getExplorerCatalog('pants');
-
-if (!catalog) {
-  throw new Error('The Pants catalog is not configured.');
+let categories: AdminCategory[] = [];
+let catalog: ExplorerCatalog | null = null;
+let errorMessage = '';
+let selectedSlug = Astro.url.searchParams.get('category') ?? '';
+try {
+  const repository = await createSupabaseAdminRepository(Astro);
+  categories = await repository.listCategories();
+  if (!categories.some((category) => category.slug === selectedSlug)) {
+    selectedSlug = categories.find((category) => category.status === 'published')?.slug ?? categories[0]?.slug ?? '';
+  }
+  catalog = selectedSlug ? await repository.getRankingCatalog(selectedSlug) : null;
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'Ranking data could not be loaded.';
 }
 ---
 
@@ -21,7 +32,31 @@ if (!catalog) {
       <h1>Ranking Lab</h1>
       <p>Reproduce a public query, inspect the ordered results, and see exactly how each active attribute contributes.</p>
     </div>
-    <span class="admin-mode">{catalog.origin === 'postgres' ? 'Postgres catalog' : 'Seed fallback'}</span>
+    <span class="admin-mode">Database catalog</span>
   </header>
-  <RankingLab client:load category={catalog.category} items={catalog.items} />
+  <form class="admin-ranking-category" method="get">
+    <label>
+      <span>Category</span>
+      <select name="category" onchange="this.form.submit()">
+        {categories.map((category) => (
+          <option value={category.slug} selected={category.slug === selectedSlug}>
+            {category.name} · {category.status}
+          </option>
+        ))}
+      </select>
+    </label>
+    <noscript><button type="submit">Load category</button></noscript>
+  </form>
+  {errorMessage ? (
+    <section class="admin-error-state" role="alert">
+      <p class="eyebrow">Database error</p><h2>Ranking data could not be loaded</h2><p>{errorMessage}</p>
+      <a href="/admin/ranking/">Try again</a>
+    </section>
+  ) : catalog ? (
+    <RankingLab client:load category={catalog.category} items={catalog.items} />
+  ) : (
+    <section class="admin-empty-state admin-table-panel">
+      <span>0</span><h2>No categories</h2><p>Create a category before opening Ranking Lab.</p>
+    </section>
+  )}
 </AdminLayout>

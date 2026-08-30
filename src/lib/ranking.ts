@@ -76,12 +76,21 @@ export function explainItemScore(
   }
 
   const averageDistance = weightedDistance / totalWeight;
+  const scoredComponents = components.map((component) =>
+    component.missing
+      ? component
+      : {
+          ...component,
+          scoreContribution:
+            (component.weight / totalWeight) * (1 - (component.distance ?? 0) / 100),
+        },
+  );
   return {
     score: Math.max(0, 1 - averageDistance / 100),
     averageDistance,
     totalWeight,
-    components,
-    missingAttributes: components
+    components: scoredComponents,
+    missingAttributes: scoredComponents
       .filter((component) => component.missing)
       .map((component) => component.key),
   };

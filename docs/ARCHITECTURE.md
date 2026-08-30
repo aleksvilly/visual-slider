@@ -11,7 +11,8 @@ Astro server build on Vercel
   ├─ middleware-protected /admin
   │   ├─ Supabase Auth cookie session
   │   ├─ app_metadata.role = admin
-  │   └─ read-only operational views + Ranking Lab
+  │   ├─ authenticated item writes + Manual Import
+  │   └─ real source/run/error views + Ranking Lab
   ├─ Vue VisualExplorer + Ranking Lab islands
   │   └─ shared ranking.ts + score explanations
   └─ LocalStorage moodboard
@@ -24,7 +25,7 @@ versioned Postgres/Supabase migration
   └─ published catalog reads / authenticated admin management
 ```
 
-This is the second Phase 1 slice. Runtime catalog reads, Vercel server output, and the admin authentication boundary are connected. Admin views remain read-only until authenticated write forms and server actions are implemented.
+This is the first Phase 1/2 write slice. Runtime catalog reads, Vercel server output, and the admin authentication boundary are connected. Items can be manually imported, edited, archived, or deleted through Astro SSR forms; sources, runs, and errors are read from Postgres.
 
 ## Target platform architecture
 
@@ -395,7 +396,23 @@ Suggested areas:
 
 Admin routes are rendered on demand and guarded by Astro middleware. Supabase SSR stores the session in cookies, and every admin response is marked private/no-store. The middleware validates the user server-side and requires `user.app_metadata.role === 'admin'`; `user_metadata` is never trusted for authorization.
 
-The same immutable app-metadata claim is checked by Postgres RLS. Anonymous and ordinary authenticated users can select only published catalog rows. The admin claim can manage platform tables, although the current UI remains read-only until explicit write actions are added.
+The same immutable app-metadata claim is checked by Postgres RLS. Anonymous and ordinary authenticated users can select only published catalog rows. The admin claim manages platform tables through a request-scoped, cookie-aware Supabase client. The browser submits ordinary HTML forms to Astro; it never receives a service-role or secret key.
+
+## Manual Import architecture
+
+The first adapter is intentionally small and generic:
+
+```text
+authenticated admin form
+  → validate category + normalized 0..100 values
+  → upsert shared manual-admin source
+  → create ingestion_run
+  → create/update canonical item by source URL
+  → upsert category-scoped item_attribute_values
+  → mark run/source healthy
+```
+
+Validation and persistence failures are written to `ingestion_runs` and `ingestion_errors` where the database is available. This is a controlled one-item adapter; it does not fetch the source URL, scrape HTML, or call an AI provider. Multi-step REST writes are observable but are not yet wrapped in a database transaction; a later bulk adapter should move orchestration into a transactional server function or worker.
 
 `SUPABASE_SECRET_KEY` is not used for browser or user-session access. It is consumed only by explicit maintenance scripts such as the Pants seed import. Authenticated admin application writes should use the user's cookie-bound client and RLS wherever practical.
 

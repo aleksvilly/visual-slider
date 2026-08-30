@@ -29,7 +29,7 @@ The domain model is generic so later categories can include bags, furniture, pos
 - Supabase Postgres 17 and Supabase Auth
 - Provider-neutral server repository with a static seed fallback
 - Vercel server adapter
-- Protected read-only Phase 1 admin and Ranking Lab
+- Protected Supabase-backed admin writes and Ranking Lab
 - LocalStorage for the first moodboard implementation
 
 `/pants` uses published Postgres catalog data when the required Supabase variables are present. With no Supabase configuration it uses the checked-in seed repository, keeping local development usable. The application is now built for Vercel server deployment; the former GitHub Pages deployment workflow has been replaced by a GitHub verification workflow.
@@ -81,7 +81,7 @@ Validate it locally without contacting Supabase:
 npm run validate:migration
 ```
 
-It is tested against an in-memory PostgreSQL 17 runtime, including grants and representative anonymous/admin RLS checks. No remote migration was applied by this implementation.
+It is tested against an in-memory PostgreSQL 17 runtime, including anonymous denial, administrator create/edit/archive/delete, ingestion-run writes, and published-catalog visibility. The migration is already present in the connected production project; this admin slice does not add another migration or apply remote database changes.
 
 When you are ready to apply it, explicitly link the CLI to the existing project, confirm the ref, dry-run, and then push:
 
@@ -123,10 +123,13 @@ The user must sign in again after a role change so a fresh JWT contains the clai
 - `/` — product explanation and categories
 - `/pants` — first working visual-slider prototype
 - `/admin/login` — server-rendered Supabase Auth sign-in
-- `/admin` — protected Phase 1 operational dashboard (currently read-only)
-- `/admin/categories`, `/admin/attributes`, `/admin/items`, `/admin/sources` — catalog inspection
-- `/admin/ingestion`, `/admin/analysis`, `/admin/errors`, `/admin/duplicates` — operational empty states
-- `/admin/ranking` — shared-score Ranking Lab
+- `/admin` — protected database-backed operational dashboard
+- `/admin/items` — real catalog list with manual import, edit, archive, and delete workflows
+- `/admin/items/new` — generic category-driven Manual Import
+- `/admin/sources`, `/admin/ingestion`, `/admin/errors` — real source and import observability
+- `/admin/categories`, `/admin/attributes` — current category-definition inspection
+- `/admin/analysis`, `/admin/duplicates` — explicit future-work empty states
+- `/admin/ranking` — category-selectable database Ranking Lab with score contributions
 
 ## Project structure
 
@@ -167,6 +170,6 @@ Slider values are preferences, not strict constraints. The engine should nearly 
 
 ## Current status
 
-Phase 1 now includes a locally validated Postgres 17 migration, a server-side Supabase repository, seed fallback, an idempotent Pants import, Vercel server output, and protected admin routes. Seed images are remote references/placeholder material and are not yet a production ingestion catalog.
+Phase 1 now includes the deployed Postgres 17 foundation, a server-side Supabase repository, seed fallback, Vercel server output, protected admin routes, and the first authenticated write workflow. Manual Import is a small generic adapter: it upserts a shared manual source, records an ingestion run, creates or updates one canonical item, and writes the selected category's semantic values. Failed validation or persistence is retained in ingestion diagnostics.
 
-The publishable and privileged Supabase credentials stay in server-only modules. No service-role/secret key is shipped to the browser. Admin mutation forms are still pending; authentication and database authorization are now in place first.
+All admin forms post to Astro SSR and use the signed-in user's Supabase cookie session, so normal RLS and the `app_metadata.role = admin` policy authorize every write. No service-role/secret key is used by these routes or shipped to the browser. External scraping and AI analysis remain unimplemented.

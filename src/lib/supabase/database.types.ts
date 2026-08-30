@@ -47,6 +47,38 @@ export type Database = {
           enabled: boolean;
         }
       >;
+      sources: TableDefinition<
+        TimestampedRow & {
+          id: string;
+          slug: string;
+          name: string;
+          adapter_type: string;
+          base_url: string | null;
+          enabled: boolean;
+          display_policy: 'LINK_ONLY' | 'EMBED' | 'PREVIEW' | 'LICENSED' | 'BUYABLE';
+          adapter_version: string;
+          configuration: Json;
+          status: 'idle' | 'running' | 'healthy' | 'degraded' | 'disabled';
+          last_run_at: string | null;
+          last_success_at: string | null;
+        }
+      >;
+      ingestion_runs: TableDefinition<{
+        id: string;
+        source_id: string;
+        status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+        adapter_version: string;
+        started_at: string | null;
+        finished_at: string | null;
+        imported_count: number;
+        updated_count: number;
+        skipped_count: number;
+        duplicate_count: number;
+        failed_count: number;
+        error_summary: string | null;
+        metadata: Json;
+        created_at: string;
+      }>;
       items: TableDefinition<
         TimestampedRow & {
           id: string;
@@ -82,6 +114,16 @@ export type Database = {
         source: 'manual' | 'imported' | 'analysis' | 'corrected';
         created_at: string;
         updated_at: string;
+      }>;
+      ingestion_errors: TableDefinition<{
+        id: string;
+        ingestion_run_id: string;
+        source_external_id: string | null;
+        stage: string;
+        code: string | null;
+        message: string;
+        context: Json;
+        created_at: string;
       }>;
     };
     Views: Record<string, never>;

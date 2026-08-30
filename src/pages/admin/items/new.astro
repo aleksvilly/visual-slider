@@ -1,0 +1,81 @@
+---
+import AdminItemForm from '../../../components/admin/AdminItemForm.vue';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { AdminFormError, assertSameOrigin, parseAdminItemForm } from '../../../lib/admin/itemForm.server';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminCategory } from '../../../lib/admin/types';
+
+let repository: Awaited<ReturnType<typeof createSupabaseAdminRepository>> | null = null;
+let categories: AdminCategory[] = [];
+let errorMessage = '';
+let initial: Record<string, unknown> = {};
+let submittedFormData: FormData | null = null;
+let formOriginAccepted = false;
+
+try {
+  repository = await createSupabaseAdminRepository(Astro);
+  categories = await repository.listCategories();
+  if (Astro.request.method === 'POST') {
+    assertSameOrigin(Astro.request);
+    formOriginAccepted = true;
+    const formData = await Astro.request.formData();
+    submittedFormData = formData;
+    const categoryId = String(formData.get('categoryId') ?? '');
+    initial = {
+      categoryId,
+      title: String(formData.get('title') ?? ''),
+      sourceUrl: String(formData.get('sourceUrl') ?? ''),
+      imageUrl: String(formData.get('imageUrl') ?? ''),
+      creator: String(formData.get('creator') ?? ''),
+      sourceSite: String(formData.get('sourceSite') ?? ''),
+      priceAmount: String(formData.get('priceAmount') ?? ''),
+      priceCurrency: String(formData.get('priceCurrency') ?? ''),
+      publicationStatus: String(formData.get('publicationStatus') ?? 'draft'),
+      attributes: Object.fromEntries(
+        (categories.find((category) => category.id === categoryId)?.attributes ?? []).map(
+          (attribute) => [attribute.id, String(formData.get(`attribute:${attribute.id}`) ?? '')],
+        ),
+      ),
+    };
+    const result = await repository.manualImport(parseAdminItemForm(formData, categories));
+    if (!result.itemId || !result.runId) throw new Error('Manual import returned no item or run ID.');
+    return Astro.redirect(`/admin/items/${result.itemId}/?imported=1&run=${result.runId}`, 303);
+  }
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'The manual import could not be completed.';
+  if (repository && submittedFormData && formOriginAccepted && error instanceof AdminFormError) {
+    try {
+      await repository.recordManualImportValidationFailure(
+        errorMessage,
+        String(submittedFormData.get('sourceUrl') ?? '').trim() || null,
+        String(submittedFormData.get('categoryId') ?? '').trim() || null,
+      );
+    } catch (loggingError) {
+      const loggingMessage = loggingError instanceof Error ? loggingError.message : 'unknown logging error';
+      errorMessage = `${errorMessage} The failed attempt could not be logged: ${loggingMessage}`;
+    }
+  }
+}
+---
+
+<AdminLayout
+  title="Manual import"
+  activeSection="items"
+  description="Create or update one canonical item through the observable manual source adapter."
+>
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">Manual source adapter</p>
+      <h1>Import item</h1>
+      <p>A successful submission upserts the manual source, records an ingestion run, persists the item, and writes category-scoped attributes.</p>
+    </div>
+    <span class="admin-mode">Authenticated write</span>
+  </header>
+  <AdminItemForm
+    client:load
+    mode="create"
+    {categories}
+    initial={initial}
+    {errorMessage}
+  />
+</AdminLayout>

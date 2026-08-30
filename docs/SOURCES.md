@@ -39,6 +39,10 @@ Every externally sourced item should retain:
 
 The current seed catalog is only for interface validation. Some entries are explicitly synthetic placeholders.
 
+## Manual admin adapter
+
+The first implemented source adapter is a controlled one-item Manual Import. It accepts metadata supplied by an authenticated administrator, preserves the canonical URL, writes category-defined semantic values, and records its run/error state. It does not request or parse the submitted URL, so it is not an external scraper. All manual items share the `manual-admin` source record while retaining their own source site and canonical attribution.
+
 ## Production note
 
 Attribution or a source link alone does not automatically grant the right to reproduce arbitrary copyrighted images. Before web-scale ingestion, define source-specific collection/display rules, robots/terms handling, caching behavior, takedown/claim flow, and partner/creator options.

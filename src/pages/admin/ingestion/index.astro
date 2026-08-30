@@ -1,0 +1,44 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminIngestionRun } from '../../../lib/admin/types';
+
+let runs: AdminIngestionRun[] = [];
+let errorMessage = '';
+try {
+  runs = await (await createSupabaseAdminRepository(Astro)).listIngestionRuns();
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'Ingestion runs could not be loaded.';
+}
+const formatDate = (value: string | null) => value
+  ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  : '—';
+---
+
+<AdminLayout title="Ingestion runs" activeSection="ingestion" description="Inspect real import status, timing, counts, and failures.">
+  <header class="admin-page-head">
+    <div><p class="eyebrow">Source operations</p><h1>Ingestion runs</h1><p>Manual imports use the same observable run model planned for later source adapters.</p></div>
+    <span class="admin-mode">Supabase runs</span>
+  </header>
+  {errorMessage ? (
+    <section class="admin-error-state" role="alert"><p class="eyebrow">Database error</p><h2>Runs could not be loaded</h2><p>{errorMessage}</p><a href="/admin/ingestion/">Try again</a></section>
+  ) : (
+    <section class="admin-table-panel">
+      <div class="admin-table-meta"><strong>{runs.length} {runs.length === 1 ? 'run' : 'runs'}</strong><span>Newest first</span></div>
+      {runs.length ? (
+        <div class="admin-table-scroll"><table class="admin-table">
+          <thead><tr><th>Source</th><th>Status</th><th>Started</th><th>Finished</th><th>Imported</th><th>Updated</th><th>Skipped</th><th>Duplicates</th><th>Failed</th></tr></thead>
+          <tbody>{runs.map((run) => (
+            <tr>
+              <td><strong>{run.sourceName}</strong><small class="admin-table-subline">{run.adapterVersion} · {run.id}</small>{run.errorSummary && <small class="admin-table-error">{run.errorSummary}</small>}</td>
+              <td><span class={`admin-status admin-status-${run.status}`}>{run.status}</span></td>
+              <td>{formatDate(run.startedAt)}</td><td>{formatDate(run.finishedAt)}</td><td>{run.importedCount}</td><td>{run.updatedCount}</td><td>{run.skippedCount}</td><td>{run.duplicateCount}</td><td>{run.failedCount}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      ) : (
+        <div class="admin-empty-state"><span>0</span><h2>No ingestion runs</h2><p>Complete a Manual import to create the first run.</p><a class="admin-inline-link" href="/admin/items/new/">Open Manual import →</a></div>
+      )}
+    </section>
+  )}
+</AdminLayout>

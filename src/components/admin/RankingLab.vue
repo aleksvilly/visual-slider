@@ -66,6 +66,11 @@ function updatePreference(key: string, event: Event) {
         </div>
         <span>No hard constraints</span>
       </div>
+      <div v-if="ranked.length === 0" class="admin-empty-state admin-empty-state-compact">
+        <span>0</span>
+        <h2>No published items</h2>
+        <p>Publish a catalog item to include it in this ranking query.</p>
+      </div>
       <button
         v-for="(result, index) in ranked"
         :key="result.item.id"
@@ -114,11 +119,12 @@ function updatePreference(key: string, event: Event) {
           <thead>
             <tr>
               <th>Attribute</th>
-              <th>Wanted</th>
-              <th>Item</th>
+              <th>User slider</th>
+              <th>Raw item value</th>
               <th>Distance</th>
               <th>Weight</th>
-              <th>Weighted</th>
+              <th>Weighted distance</th>
+              <th>Score contribution</th>
             </tr>
           </thead>
           <tbody>
@@ -129,14 +135,18 @@ function updatePreference(key: string, event: Event) {
               <td>{{ component.distance ?? 'Ignored' }}</td>
               <td>{{ component.weight }}</td>
               <td>{{ component.weightedDistance?.toFixed(2) ?? '—' }}</td>
+              <td>{{ component.scoreContribution === undefined ? '—' : `${(component.scoreContribution * 100).toFixed(2)}%` }}</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <details class="ranking-raw-values">
+        <summary>Raw item attribute object</summary>
+        <pre>{{ JSON.stringify(inspected.item.attributes, null, 2) }}</pre>
+      </details>
       <p class="ranking-formula">
-        Semantic score = 1 − (weighted average distance ÷ 100). Missing values are omitted, not treated as zero.
+        Total score = the sum of per-attribute score contributions. Missing values are omitted, not treated as zero.
       </p>
     </section>
   </div>
 </template>
-

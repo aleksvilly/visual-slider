@@ -106,6 +106,22 @@ try {
 if (!ordinaryWriteDenied) {
   throw new Error('Ordinary authenticated user unexpectedly wrote to sources.');
 }
+let ordinaryItemWriteDenied = false;
+try {
+  await db.exec(`
+    insert into public.items (
+      public_id, category_id, title, source_site, image_url, publication_status
+    )
+    select 'ordinary-denied-item', id, 'Denied item', 'Test',
+      'https://example.com/denied.jpg', 'published'
+    from public.categories where slug = 'published-test';
+  `);
+} catch {
+  ordinaryItemWriteDenied = true;
+}
+if (!ordinaryItemWriteDenied) {
+  throw new Error('Ordinary authenticated user unexpectedly wrote to catalog items.');
+}
 
 await db.exec(`
   reset role;
@@ -125,10 +141,91 @@ if (adminCategories.rows[0]?.count !== 2) {
 await db.exec(`
   insert into public.sources (slug, name, adapter_type, adapter_version)
   values ('admin-source', 'Admin source', 'test', '1');
+
+  insert into public.attribute_definitions (
+    category_id, key, label, low_label, high_label
+  )
+  select id, 'test-attribute', 'Test attribute', 'Low', 'High'
+  from public.categories where slug = 'published-test';
+
+  insert into public.ingestion_runs (
+    source_id, status, adapter_version, started_at, finished_at, imported_count
+  )
+  select id, 'succeeded', '1', now(), now(), 1
+  from public.sources where slug = 'admin-source';
+
+  insert into public.items (
+    public_id, category_id, source_id, source_external_id, title,
+    source_site, canonical_source_url, image_url, publication_status
+  )
+  select
+    'admin-created-item', categories.id, sources.id, 'admin-created-item',
+    'Admin created', 'Test source', 'https://example.com/admin-created-item',
+    'https://example.com/image.jpg', 'published'
+  from public.categories
+  cross join public.sources
+  where categories.slug = 'published-test' and sources.slug = 'admin-source';
+
+  insert into public.item_attribute_values (item_id, attribute_id, category_id, value)
+  select items.id, attributes.id, categories.id, 72
+  from public.items
+  join public.categories on categories.id = items.category_id
+  join public.attribute_definitions attributes on attributes.category_id = categories.id
+  where items.public_id = 'admin-created-item' and attributes.key = 'test-attribute';
+`);
+
+await db.exec('reset role; set role anon');
+const visiblePublishedItem = await db.query<{ count: number }>(`
+  select count(*)::int as count from public.items where public_id = 'admin-created-item'
+`);
+if (visiblePublishedItem.rows[0]?.count !== 1) {
+  throw new Error('An admin-created published item was not visible to the public catalog role.');
+}
+
+await db.exec(`
+  reset role;
+  select set_config(
+    'request.jwt.claims',
+    '{"app_metadata":{"role":"admin"}}',
+    false
+  );
+  set role authenticated;
+  update public.items
+  set title = 'Admin edited', publication_status = 'archived'
+  where public_id = 'admin-created-item';
+`);
+const editedItem = await db.query<{ title: string; publication_status: string }>(`
+  select title, publication_status from public.items where public_id = 'admin-created-item'
+`);
+if (
+  editedItem.rows[0]?.title !== 'Admin edited' ||
+  editedItem.rows[0]?.publication_status !== 'archived'
+) {
+  throw new Error('Admin could not edit and archive a catalog item.');
+}
+
+await db.exec('reset role; set role anon');
+const hiddenArchivedItem = await db.query<{ count: number }>(`
+  select count(*)::int as count from public.items where public_id = 'admin-created-item'
+`);
+if (hiddenArchivedItem.rows[0]?.count !== 0) {
+  throw new Error('An archived item remained visible to the public catalog role.');
+}
+
+await db.exec(`
+  reset role;
+  select set_config(
+    'request.jwt.claims',
+    '{"app_metadata":{"role":"admin"}}',
+    false
+  );
+  set role authenticated;
+  delete from public.items where public_id = 'admin-created-item';
 `);
 
 await db.close();
 console.log(
   `Validated ${migrationPath.pathname.split('/').at(-1)} on PostgreSQL ${version.rows[0]?.server_version}: ` +
-    `${tables.rows[0]?.count} tables, ${rlsTables.rows[0]?.count} RLS-enabled, ${policies.rows[0]?.count} policies.`,
+    `${tables.rows[0]?.count} tables, ${rlsTables.rows[0]?.count} RLS-enabled, ${policies.rows[0]?.count} policies; ` +
+    'admin create/edit/archive/delete and public visibility checks passed.',
 );

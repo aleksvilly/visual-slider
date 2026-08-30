@@ -1,0 +1,73 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminSource } from '../../../lib/admin/types';
+
+let sources: AdminSource[] = [];
+let errorMessage = '';
+try {
+  sources = await (await createSupabaseAdminRepository(Astro)).listSources();
+} catch (error) {
+  errorMessage = error instanceof Error ? error.message : 'Sources could not be loaded.';
+}
+const formatDate = (value: string | null) => value
+  ? new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  : 'Never';
+---
+
+<AdminLayout
+  title="Sources"
+  activeSection="sources"
+  description="Inspect the real ingestion origins, adapter versions, display policy, and operational health."
+>
+  <header class="admin-page-head">
+    <div>
+      <p class="eyebrow">Ingestion origins</p>
+      <h1>Sources</h1>
+      <p>Source configuration is read from Supabase. Adapter credentials remain outside this table and outside browser code.</p>
+    </div>
+    <span class="admin-mode">Supabase sources</span>
+  </header>
+
+  {errorMessage ? (
+    <section class="admin-error-state" role="alert">
+      <p class="eyebrow">Database error</p>
+      <h2>Sources could not be loaded</h2>
+      <p>{errorMessage}</p>
+      <a href="/admin/sources/">Try again</a>
+    </section>
+  ) : (
+    <section class="admin-table-panel">
+      <div class="admin-table-meta">
+        <strong>{sources.length} {sources.length === 1 ? 'source' : 'sources'}</strong>
+        <span>Authenticated database view</span>
+      </div>
+      {sources.length ? (
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead><tr><th>Source</th><th>Adapter</th><th>Policy</th><th>Enabled</th><th>Status</th><th>Last run</th><th>Last success</th></tr></thead>
+            <tbody>
+              {sources.map((source) => (
+                <tr>
+                  <td><strong>{source.name}</strong><small class="admin-table-subline">{source.slug}</small></td>
+                  <td>{source.adapterType} · {source.adapterVersion}</td>
+                  <td>{source.displayPolicy}</td>
+                  <td>{source.enabled ? 'Yes' : 'No'}</td>
+                  <td><span class={`admin-status admin-status-${source.status}`}>{source.status}</span></td>
+                  <td>{formatDate(source.lastRunAt)}</td>
+                  <td>{formatDate(source.lastSuccessAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div class="admin-empty-state">
+          <span>0</span><h2>No sources</h2>
+          <p>The first Manual import will create the shared manual-admin source automatically.</p>
+          <a class="admin-inline-link" href="/admin/items/new/">Open Manual import →</a>
+        </div>
+      )}
+    </section>
+  )}
+</AdminLayout>

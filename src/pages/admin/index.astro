@@ -1,19 +1,32 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { adminSummary } from '../../lib/platform/adminReadModel';
+import { createSupabaseAdminRepository } from '../../lib/admin/supabaseAdminRepository.server';
 
 const base = import.meta.env.BASE_URL.endsWith('/')
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
 
-const cards = [
-  ['Categories', adminSummary.categories, 'categories'],
-  ['Attributes', adminSummary.attributes, 'attributes'],
-  ['Catalog items', adminSummary.items, 'items'],
-  ['Sources', adminSummary.sources, 'sources'],
-  ['Open errors', adminSummary.openErrors, 'errors'],
-  ['Review queue', adminSummary.reviewQueue, 'duplicates'],
-] as const;
+let cards: ReadonlyArray<readonly [string, number, string]> = [];
+let dashboardError = '';
+try {
+  const repository = await createSupabaseAdminRepository(Astro);
+  const [categories, items, sources, errors] = await Promise.all([
+    repository.listCategories(),
+    repository.listItems(),
+    repository.listSources(),
+    repository.listIngestionErrors(),
+  ]);
+  cards = [
+    ['Categories', categories.length, 'categories'],
+    ['Attributes', categories.reduce((total, category) => total + category.attributes.length, 0), 'attributes'],
+    ['Catalog items', items.length, 'items'],
+    ['Sources', sources.length, 'sources'],
+    ['Recorded errors', errors.length, 'errors'],
+    ['Review queue', 0, 'duplicates'],
+  ];
+} catch (error) {
+  dashboardError = error instanceof Error ? error.message : 'Dashboard totals could not be loaded.';
+}
 ---
 
 <AdminLayout title="Dashboard" activeSection="dashboard">
@@ -28,36 +41,40 @@ const cards = [
   <section class="admin-callout">
     <strong>Platform seam active</strong>
     <p>
-      The public explorer selects the server-side Postgres repository when Supabase is configured and otherwise uses the checked-in seed fallback. Admin routes require a validated user with the administrator app-metadata role.
+      Catalog totals and operational records now come from Supabase. Admin reads and writes use the signed-in user's cookie session and remain subject to the administrator RLS policies.
     </p>
   </section>
 
-  <section class="admin-stat-grid" aria-label="Catalog totals">
-    {cards.map(([label, value, path]) => (
-      <a href={`${base}admin/${path}/`}>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>Inspect →</small>
-      </a>
-    ))}
-  </section>
+  {dashboardError ? (
+    <section class="admin-error-state" role="alert"><p class="eyebrow">Database error</p><h2>Dashboard totals could not be loaded</h2><p>{dashboardError}</p></section>
+  ) : (
+    <section class="admin-stat-grid" aria-label="Catalog totals">
+      {cards.map(([label, value, path]) => (
+        <a href={`${base}admin/${path}/`}>
+          <span>{label}</span>
+          <strong>{value}</strong>
+          <small>Inspect →</small>
+        </a>
+      ))}
+    </section>
+  )}
 
   <section class="admin-panel-grid">
     <article class="admin-panel">
-      <p class="eyebrow">Fallback catalog</p>
-      <h2>Pants prototype seed</h2>
+      <p class="eyebrow">Manual adapter</p>
+      <h2>One-item import</h2>
       <dl class="admin-definition-list">
-        <div><dt>Enabled</dt><dd>Yes</dd></div>
-        <div><dt>Adapter</dt><dd>Checked-in seed</dd></div>
-        <div><dt>Last run</dt><dd>Not ingested</dd></div>
-        <div><dt>Status</dt><dd>Ready if unconfigured</dd></div>
+        <div><dt>Authorization</dt><dd>Admin RLS</dd></div>
+        <div><dt>Adapter</dt><dd>manual 1.0.0</dd></div>
+        <div><dt>Observability</dt><dd>Runs + errors</dd></div>
+        <div><dt>AI / scraping</dt><dd>Not used</dd></div>
       </dl>
     </article>
     <article class="admin-panel">
       <p class="eyebrow">Operational state</p>
-      <h2>No jobs or failures</h2>
+      <h2>Observable imports</h2>
       <p>
-        Ingestion and AI tables are defined, but no worker is connected in this first slice. Empty states are explicit so static demo data is never mistaken for completed ingestion.
+        Each manual import creates an ingestion run and persists detailed failures. External adapters and AI analysis remain intentionally disconnected.
       </p>
     </article>
     <article class="admin-panel admin-panel-featured">

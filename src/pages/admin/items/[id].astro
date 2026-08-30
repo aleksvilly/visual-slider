@@ -1,0 +1,137 @@
+---
+import AdminItemForm from '../../../components/admin/AdminItemForm.vue';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { assertSameOrigin, parseAdminItemForm } from '../../../lib/admin/itemForm.server';
+import { createSupabaseAdminRepository } from '../../../lib/admin/supabaseAdminRepository.server';
+import type { AdminCategory, AdminItemDetail } from '../../../lib/admin/types';
+
+const itemId = Astro.params.id ?? '';
+let repository: Awaited<ReturnType<typeof createSupabaseAdminRepository>> | null = null;
+let categories: AdminCategory[] = [];
+let item: AdminItemDetail | null = null;
+let errorMessage = '';
+let loadError = '';
+let initial: Record<string, unknown> | undefined;
+
+try {
+  repository = await createSupabaseAdminRepository(Astro);
+  [categories, item] = await Promise.all([
+    repository.listCategories(),
+    repository.getItem(itemId),
+  ]);
+} catch (error) {
+  loadError = error instanceof Error ? error.message : 'The item could not be loaded.';
+}
+
+if (Astro.request.method === 'POST' && repository && item) {
+  try {
+    assertSameOrigin(Astro.request);
+    const formData = await Astro.request.formData();
+    const intent = String(formData.get('intent') ?? 'save');
+    if (intent === 'delete') {
+      await repository.deleteItem(itemId);
+      return Astro.redirect('/admin/items/?deleted=1', 303);
+    }
+    if (intent === 'archive') {
+      await repository.archiveItem(itemId);
+      return Astro.redirect(`/admin/items/${itemId}/?archived=1`, 303);
+    }
+    const input = parseAdminItemForm(formData, categories);
+    initial = {
+      categoryId: input.categoryId,
+      title: input.title,
+      sourceUrl: input.sourceUrl,
+      imageUrl: input.imageUrl,
+      creator: input.creator ?? '',
+      sourceSite: input.sourceSite,
+      priceAmount: input.priceAmount,
+      priceCurrency: input.priceCurrency ?? '',
+      publicationStatus: input.publicationStatus,
+      attributes: input.attributeValues,
+    };
+    await repository.updateItem(itemId, input);
+    return Astro.redirect(`/admin/items/${itemId}/?saved=1`, 303);
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'The item could not be updated.';
+    try {
+      item = await repository.getItem(itemId);
+    } catch (reloadError) {
+      const reloadMessage = reloadError instanceof Error ? reloadError.message : 'reload failed';
+      errorMessage = `${errorMessage} Current values could not be reloaded: ${reloadMessage}`;
+    }
+  }
+}
+
+if (!item) Astro.response.status = loadError ? 500 : 404;
+const saved = Astro.url.searchParams.get('saved') === '1';
+const imported = Astro.url.searchParams.get('imported') === '1';
+const archived = Astro.url.searchParams.get('archived') === '1';
+const defaultInitial = item ? {
+  categoryId: item.categoryId,
+  title: item.title,
+  sourceUrl: item.sourceUrl ?? '',
+  imageUrl: item.imageUrl,
+  creator: item.creator ?? '',
+  sourceSite: item.sourceSite,
+  priceAmount: item.priceAmount,
+  priceCurrency: item.priceCurrency ?? '',
+  publicationStatus: item.publicationStatus,
+  attributes: item.attributes,
+} : {};
+---
+
+<AdminLayout
+  title={item ? `Edit ${item.title}` : 'Item not found'}
+  activeSection="items"
+  description="Edit canonical item metadata, publication state, and category-scoped semantic attributes."
+>
+  {item ? (
+    <>
+      <header class="admin-page-head">
+        <div>
+          <p class="eyebrow">{item.categoryName} · {item.publicId}</p>
+          <h1>Edit item</h1>
+          <p>Changes use the authenticated Supabase session and remain subject to the database admin policies.</p>
+        </div>
+        <span class={`admin-status admin-status-${item.publicationStatus}`}>{item.publicationStatus}</span>
+      </header>
+      {(saved || imported || archived) && (
+        <p class="admin-form-message admin-form-success" role="status">
+          {imported ? 'Manual import completed and its ingestion run was recorded.' : archived ? 'Item archived.' : 'Changes saved.'}
+        </p>
+      )}
+      <AdminItemForm
+        client:load
+        mode="edit"
+        {categories}
+        initial={initial ?? defaultInitial}
+        {errorMessage}
+      />
+      <section class="admin-danger-zone">
+        <div><p class="eyebrow">Lifecycle</p><h2>Archive or delete</h2></div>
+        <div class="admin-danger-actions">
+          <form method="post">
+            <button type="submit" name="intent" value="archive">Archive item</button>
+          </form>
+          <form method="post" onsubmit="return confirm('Permanently delete this item and its attribute values?')">
+            <button class="danger" type="submit" name="intent" value="delete">Delete permanently</button>
+          </form>
+        </div>
+      </section>
+    </>
+  ) : loadError ? (
+    <section class="admin-error-state" role="alert">
+      <p class="eyebrow">Database error</p>
+      <h1>Item could not be loaded</h1>
+      <p>{loadError}</p>
+      <a href={`/admin/items/${itemId}/`}>Try again</a>
+    </section>
+  ) : (
+    <section class="admin-error-state">
+      <p class="eyebrow">404</p>
+      <h1>Item not found</h1>
+      <p>The requested catalog item does not exist or was deleted.</p>
+      <a href="/admin/items/">Back to items</a>
+    </section>
+  )}
+</AdminLayout>
