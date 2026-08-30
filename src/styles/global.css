@@ -142,6 +142,7 @@ button { color: inherit; }
 .moodboard-head button { border: 0; background: transparent; font-size: 24px; cursor: pointer; }
 .saved-item { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #ddd; text-decoration: none; }
 .saved-item small { color: #777; }
+.saved-item-demo { cursor: default; }
 .muted { color: #777; }
 
 .results-panel { min-width: 0; }
@@ -173,9 +174,18 @@ button { color: inherit; }
 .item-note { font-size: 12px; line-height: 1.35; color: #666; }
 .attribute-strip { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0; }
 .attribute-strip span { padding: 5px 7px; background: #e5e2d9; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
-.card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .card-actions button, .card-actions a { padding: 8px 9px; font-size: 10px; font-weight: 700; }
 .card-actions button:nth-child(2) { background: transparent; color: #111; }
+.demo-source {
+  padding: 8px 9px;
+  border: 1px dashed #aaa69b;
+  color: #777;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 
 @media (max-width: 1100px) {
   .principle-grid { grid-template-columns: repeat(2, 1fr); }
